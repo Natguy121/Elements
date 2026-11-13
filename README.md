@@ -10,9 +10,9 @@ It runs in any modern browser, on phones and desktops, with no install.
 2. **Periodic table** – all 118 elements are there; locked ones are grey, the next one to play pops out of the grid.
 3. **The lab** – a 3D lab with a bench full of equipment.
    - Open the door, a labelled package is delivered (thrown), open it to get your sample.
-   - Use the stations: **Balloon**, **Burner**, **Zapper** (high-voltage tube), **Tank** (water), **Mic**, and the **Mixer**.
-   - Each element has three listed experiments. Every station reacts to every element, so the other two are there for fun.
-   - Drag to look around, tap things (or use the dock at the bottom) to use them.
+   - Walk around freely. Touch: left thumb is a walk stick, the rest of the screen looks. Desktop: WASD + drag.
+   - Equipment is spread around the room and nothing tells you what to use: a balloon rig, a burner, a high-voltage tube, a water tank, a microphone and a mixer. Walk up to something and tap it (or press the button that appears) to try your sample on it.
+   - Each element has three hidden discoveries, shown as `???` until you find them. Every station reacts to every element, so the rest are there for fun.
 4. **Mixing** – once you own two elements, the Mixer combines any pair. There are 34 real compounds to discover (water, table salt, laughing gas, …) and a lot of awkward silences.
 
 Progress is saved in the browser.

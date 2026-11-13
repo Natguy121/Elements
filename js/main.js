@@ -74,7 +74,7 @@ function show(next) {
   $('table').hidden = next !== 'table';
   $('hud').hidden = next !== 'lab';
   if (next === 'menu') L.setView('menu');
-  L.setLift(next === 'lab' ? (window.innerWidth < window.innerHeight ? 0.07 : 0.13) : 0);
+  L.setLift(next === 'lab' ? 0.05 : 0);
   if (next === 'table') refreshTable();
 }
 
@@ -116,7 +116,7 @@ function refreshTable() {
   const n = Math.min(save.unlocked, MAX_PLAYABLE);
   $('tProgress').textContent = `${n} of 118 unlocked · ${Object.keys(save.mixes).length} compounds found`;
   $('tHint').textContent = up
-    ? `${NAMES[up - 1]} is waiting. Finish three experiments with it to unlock the next element.`
+    ? `${NAMES[up - 1]} is waiting. Make three discoveries with it to unlock the next element.`
     : 'Every delivered element is cleared. The mixer is still open for bad ideas.';
   if ($('grid').scrollWidth > $('tScroll').clientWidth) $('tHint').textContent += ' Swipe sideways to see the whole table.';
   if (up) requestAnimationFrame(() => cells[up].scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' }));
@@ -159,7 +159,7 @@ function refreshHud() {
   $('chipName').textContent = NAMES[z - 1];
   const done = save.done[z] || {};
   $('tasks').innerHTML = `<li class="head">Experiments ${tasksDone(z)}/3</li>` +
-    el.tasks.map((t) => `<li class="${done[t] ? 'done' : ''}">${taskName(z, t)}</li>`).join('');
+    el.tasks.map((t) => `<li class="${done[t] ? 'done' : ''}">${done[t] ? taskName(z, t) : '??? (undiscovered)'}</li>`).join('');
   STATIONS.forEach((s) => {
     const isTask = el.tasks.includes(s.id);
     dockBtns[s.id].classList.toggle('todo', isTask && !done[s.id]);
@@ -189,6 +189,7 @@ function resolveTap(kind) {
 }
 $('marker').onclick = () => resolveTap();
 
+const HOWTO = matchMedia('(pointer: coarse)').matches ? 'Left thumb walks. Right thumb looks. Tap things to use them.' : 'W A S D to walk. Drag to look. Click things to use them.';
 const firstTodo = (z) => CONTENT[z].tasks.find((t) => !(save.done[z] && save.done[z][t])) || CONTENT[z].tasks[0];
 
 async function enterLab(z) {
@@ -200,22 +201,20 @@ async function enterLab(z) {
   if (!save.delivered[z]) {
     phase = 'delivery'; busy = true;
     refreshHud();
-    L.setView('door', true);
+    L.startWalk(0.3, 0.4, -0.82);
+    toast(HOWTO, 5000);
     try { await X.deliver(z, waitTap); } catch (e) { if (e !== 'cancel') throw e; return; }
     if (my !== session) return;
     save.delivered[z] = true; persist();
     phase = 'play';
-    const st = firstTodo(z);
-    L.setView(st);
-    await X.bring(st);
+    await X.toHome();
     if (my !== session) return;
     busy = false;
-    ui.caption('Three experiments unlock the next element. Pick a glowing station below, or tap things in the lab.');
+    ui.caption('Your sample is on the trolley. Walk around the lab and try it on things. Three of them are the discoveries that unlock the next element.');
   } else {
     phase = 'play'; busy = false;
-    const st = firstTodo(z);
-    X.placeSample(z, st);
-    L.setView(st, true);
+    X.placeSample(z);
+    L.startWalk(0.3, 0.9, 0);
     ui.caption(isCleared(z) ? `${NAMES[z - 1]} again. Everything here still works. Go wild.` : el.intro);
   }
   refreshHud();
@@ -235,7 +234,7 @@ function leaveLab() {
   show('table');
 }
 $('btnBack').onclick = leaveLab;
-$('btnWide').onclick = () => { if (!busy) { L.setView('wide'); sfx.click(); } };
+
 
 async function useStation(id) {
   if (state !== 'lab' || busy || phase !== 'play') return;
@@ -247,6 +246,8 @@ async function useStation(id) {
   if (my !== session) return;
   ui.caption(r.text);
   const isTask = CONTENT[z].tasks.includes(id);
+  if (!isTask && !isCleared(z)) toast('Fun, but not one of the three discoveries. Keep exploring.');
+  else if (isTask && !(save.done[z] && save.done[z][id])) toast('Discovery! ' + taskName(z, id));
   save.done[z] = save.done[z] || {};
   let justCleared = false;
   if (isTask && !save.done[z][id]) {
@@ -364,35 +365,73 @@ $('confirmYes').onclick = () => {
   sfx.pop();
 };
 
-// ---------- pointer: drag to look around, tap to use things ----------
-let drag = null;
+// ---------- controls: walk + look + tap ----------
+// Touch: a thumbstick appears wherever the left thumb lands; the rest of the screen looks around.
+// Mouse: drag to look. Keyboard: WASD / arrows walk.
+let joy = null, drag = null, nearId = null;
+const keys = {};
+window.addEventListener('keydown', (e) => { keys[e.code] = true; });
+window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 canvas.addEventListener('pointerdown', (e) => {
   if (state !== 'lab') return;
-  drag = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now(), moved: false };
   canvas.setPointerCapture(e.pointerId);
+  if (e.pointerType === 'touch' && !joy && e.clientX < window.innerWidth * 0.4 && e.clientY > window.innerHeight * 0.35) {
+    joy = { id: e.pointerId, ox: e.clientX, oy: e.clientY, dx: 0, dy: 0, t: performance.now(), moved: false };
+    const j = $('joy');
+    j.style.left = e.clientX + 'px'; j.style.top = e.clientY + 'px'; j.firstElementChild.style.transform = '';
+    j.hidden = false;
+    return;
+  }
+  if (!drag) drag = { id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now(), moved: false };
 });
 canvas.addEventListener('pointermove', (e) => {
-  if (!drag) return;
+  if (joy && e.pointerId === joy.id) {
+    let dx = e.clientX - joy.ox, dy = e.clientY - joy.oy;
+    const len = Math.hypot(dx, dy), max = 56;
+    if (len > max) { dx *= max / len; dy *= max / len; }
+    if (len > 8) joy.moved = true;
+    joy.dx = dx / max; joy.dy = dy / max;
+    $('joy').firstElementChild.style.transform = `translate(${dx}px, ${dy}px)`;
+    return;
+  }
+  if (!drag || e.pointerId !== drag.id) return;
   const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
   drag.x = e.clientX; drag.y = e.clientY;
   if (Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy) > 10) drag.moved = true;
-  if (drag.moved) {
-    L.rig.yaw = Math.max(-1.1, Math.min(1.1, L.rig.yaw + dx * 0.004));
-    L.rig.pitch = Math.max(-0.5, Math.min(0.6, L.rig.pitch + dy * 0.004));
-  }
+  if (drag.moved) L.look(dx * 0.0045, dy * 0.0045);
 });
-const endDrag = (e) => {
-  if (!drag) return;
-  const d = drag; drag = null;
-  if (d.moved || performance.now() - d.t > 500) return;
+function tapAt(e) {
   const r = canvas.getBoundingClientRect();
   const id = L.pick(((e.clientX - r.left) / r.width) * 2 - 1, -(((e.clientY - r.top) / r.height) * 2 - 1));
   if (!id) return;
   if (id === 'door' || id === 'pkg') resolveTap(id);
   else useStation(id);
+}
+const endPointer = (e) => {
+  if (joy && e.pointerId === joy.id) {
+    const j = joy; joy = null; $('joy').hidden = true;
+    if (!j.moved && performance.now() - j.t < 400) tapAt(e);
+    return;
+  }
+  if (!drag || e.pointerId !== drag.id) return;
+  const d = drag; drag = null;
+  if (!d.moved && performance.now() - d.t < 500) tapAt(e);
 };
-canvas.addEventListener('pointerup', endDrag);
-canvas.addEventListener('pointercancel', () => { drag = null; });
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', (e) => { if (joy && e.pointerId === joy.id) { joy = null; $('joy').hidden = true; } if (drag && e.pointerId === drag.id) drag = null; });
+$('btnUse').onclick = () => { if (nearId) useStation(nearId); };
+function controls(dt) {
+  if (state !== 'lab') return;
+  let f = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
+  let s = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
+  if (keys.ArrowLeft) L.look(-1.8 * dt, 0);
+  if (keys.ArrowRight) L.look(1.8 * dt, 0);
+  if (joy) { f -= joy.dy; s += joy.dx; }
+  if (f || s) L.move(dt, Math.max(-1, Math.min(1, f)), Math.max(-1, Math.min(1, s)));
+  const near = phase === 'play' && !busy && $('mixPanel').hidden && $('unlock').hidden ? L.nearStation() : null;
+  if (near !== nearId) { nearId = near; $('btnUse').hidden = !near; }
+}
 
 // iPad Safari: stop pinch-zoom and double-tap zoom from hijacking the game
 ['gesturestart', 'gesturechange', 'dblclick'].forEach((ev) => document.addEventListener(ev, (e) => e.preventDefault(), { passive: false }));
@@ -402,7 +441,7 @@ let pixelCap = Math.min(window.devicePixelRatio || 1, 2);
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   L.resize(w, h, pixelCap);
-  L.setLift(state === 'lab' ? (w < h ? 0.07 : 0.13) : 0);
+  L.setLift(state === 'lab' ? 0.05 : 0);
   if (state === 'table') sizeTable();
 }
 const markerPos = { door: null, pkg: null };
@@ -434,6 +473,7 @@ function boot() {
     if (state === 'table' || document.hidden) return;
     t += dt;
     updateTweens(dt);
+    controls(Math.min(raw, 0.1));
     L.update(dt, t);
     L.render();
     placeMarker();

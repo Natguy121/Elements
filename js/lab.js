@@ -69,7 +69,8 @@ export function buildLab(canvas) {
   const liquid = (c) => std({ color: c, roughness: 0.12, emissive: c, emissiveIntensity: 0.1 });
 
   // ---------- mesh helpers ----------
-  const add = (geo, mat, x = 0, y = 0, z = 0, parent = scene) => {
+  let cur = null; // parent that new meshes go into (the scene, or a station that has been moved)
+  const add = (geo, mat, x = 0, y = 0, z = 0, parent = cur || scene) => {
     const m = new THREE.Mesh(geo, mat);
     m.position.set(x, y, z);
     parent.add(m);
@@ -81,8 +82,8 @@ export function buildLab(canvas) {
   const lathe = (pts, mat, x, y, z, p, seg = 36) => add(new THREE.LatheGeometry(pts.map(([r, yy]) => new THREE.Vector2(r, yy)), seg), mat, x, y, z, p);
   const plane = (w, h, mat, x, y, z, p) => add(new THREE.PlaneGeometry(w, h), mat, x, y, z, p);
   const noShadow = (m) => { m.traverse((o) => { o.userData.noShadow = true; }); return m; };
-  const group = (x = 0, y = 0, z = 0, p = scene) => { const g = new THREE.Group(); g.position.set(x, y, z); p.add(g); return g; };
-  const tube = (pts, r, mat, p = scene) => add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map((q) => V(...q))), 24, r, 8), mat, 0, 0, 0, p);
+  const group = (x = 0, y = 0, z = 0, p = cur || scene) => { const g = new THREE.Group(); g.position.set(x, y, z); p.add(g); return g; };
+  const tube = (pts, r, mat, p = cur || scene) => add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map((q) => V(...q))), 24, r, 8), mat, 0, 0, 0, p);
 
   // ---------- room ----------
   const floor = plane(10.3, 9.8, M.floor, 0, 0, -0.75);
@@ -305,7 +306,31 @@ export function buildLab(canvas) {
 
   cyl(0.035, 0.045, 0.05, M.darkSteel, -4.6, BENCH + 0.025, -2.42); // weight the party balloons are tied to
 
+  // ---------- station placement ----------
+  // Stations are modelled at bench coordinates, then some are moved out onto their own tables
+  // around the room so the player has to walk around and find them.
+  const OFF = { balloon: [1.4, 3.55], burner: [0, 0], zap: [3.8, 4.15], water: [0, 0], mic: [3.2, 4.95], mix: [0, 0] };
+  const stationPos = {};
+  Object.keys(STATION_X).forEach((id) => { stationPos[id] = { x: STATION_X[id] + OFF[id][0], z: -2.55 + OFF[id][1] }; });
+  const off = (id) => V(OFF[id][0], 0, OFF[id][1]);
+  function stationGroup(id, tableW = 1.6, cx = 0) {
+    cur = null;
+    const g = group(OFF[id][0], 0, OFF[id][1]);
+    cur = g;
+    const x = STATION_X[id] + cx;
+    box(tableW, 0.05, 0.9, M.benchTop, x, BENCH - 0.025, -2.575);
+    box(tableW - 0.1, 0.03, 0.8, M.steel, x, 0.3, -2.575);
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([a, b]) => box(0.05, BENCH - 0.05, 0.05, M.steel, x + a * (tableW / 2 - 0.05), (BENCH - 0.05) / 2, -2.575 + b * 0.4));
+    return g;
+  }
+  // trolley where the current sample waits
+  const home = V(0.9, BENCH, -0.9);
+  box(0.6, 0.04, 0.5, M.steel, home.x, BENCH - 0.02, home.z);
+  box(0.56, 0.03, 0.46, M.steel, home.x, 0.3, home.z);
+  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([a, b]) => { cyl(0.015, 0.015, BENCH - 0.1, M.steel, home.x + a * 0.27, (BENCH - 0.1) / 2 + 0.06, home.z + b * 0.22); cyl(0.035, 0.035, 0.03, M.rubber, home.x + a * 0.27, 0.035, home.z + b * 0.22).rotation.z = Math.PI / 2; });
+
   // ---------- station: balloon ----------
+  stationGroup('balloon');
   const SX = STATION_X;
   const nozzle = V(SX.balloon, 1.245, -2.5);
   cyl(0.085, 0.095, 0.03, M.darkSteel, SX.balloon, BENCH + 0.015, -2.5);
@@ -316,6 +341,9 @@ export function buildLab(canvas) {
   bbox.rotation.y = -0.3;
   box(0.2, 0.07, 0.14, M.red, 0, 0.035, 0, bbox);
   partyCols.forEach((c, i) => { const d = cyl(0.03, 0.03, 0.006, std({ color: c, roughness: 0.4 }), -0.06 + i * 0.03, 0.074 + i * 0.002, rs(0.03), bbox, 16); d.rotation.z = rs(0.2); });
+
+  nozzle.add(off('balloon'));
+  cur = null;
 
   // ---------- station: burner ----------
   const flamePos = V(SX.burner, 1.1, -2.55);
@@ -366,6 +394,7 @@ export function buildLab(canvas) {
   };
 
   // ---------- station: zapper ----------
+  stationGroup('zap');
   const zx = SX.zap;
   box(0.56, 0.075, 0.28, std({ color: 0x1f3a44, roughness: 0.35, metalness: 0.4 }), zx, BENCH + 0.038, -2.56);
   plane(0.3, 0.055, std({ map: T.signTex(['DANGER: HIGH VOLTAGE', '(AND LOW STANDARDS)'], '#ffc21a', '#111111', 512, 96, false), roughness: 0.5 }), zx + 0.02, BENCH + 0.038, -2.419);
@@ -391,8 +420,11 @@ export function buildLab(canvas) {
   [-0.05, 0.05].forEach((dx) => { cyl(0.005, 0.005, 0.1, M.copper, zx + dx, BENCH + 0.05, -2.33); box(0.016, 0.02, 0.012, M.red, zx + dx * 0.86, BENCH + 0.1, -2.33); });
   const zapLight = new THREE.PointLight(0xffffff, 0, 5, 2);
   zapLight.position.set(zx, 1.34, -2.45);
-  scene.add(zapLight);
+  cur.add(zapLight);
   const zap = { core: zCore, coreMat, lever, bulbMat, light: zapLight, tube: V(zx, 1.3, -2.6), clips: V(zx, BENCH + 0.125, -2.33), bulb: V(zx + 0.2, BENCH + 0.135, -2.47) };
+
+  [zap.tube, zap.clips, zap.bulb].forEach((v) => v.add(off('zap')));
+  cur = null;
 
   // ---------- station: water tank ----------
   const wx = SX.water, WS = 1.3, WB = BENCH + 0.035;
@@ -413,6 +445,7 @@ export function buildLab(canvas) {
   const tank = { x: wx, z: -2.56, WS, WB, water, waterMat, duck, duckHome: duck.position.clone(), duckBob: 1, duckFree: true };
 
   // ---------- station: microphone ----------
+  stationGroup('mic', 1.4, 0.15);
   const mx = SX.mic;
   const micG = group(mx, BENCH, -2.5);
   cyl(0.07, 0.08, 0.02, M.plastic, 0, 0.01, 0, micG);
@@ -431,6 +464,9 @@ export function buildLab(canvas) {
   add(new THREE.RingGeometry(0.07, 0.08, 30), M.steel, mx + 0.42, BENCH + 0.115, -2.6135);
   add(new THREE.CircleGeometry(0.022, 20), std({ color: 0x2a2d30, roughness: 0.7 }), mx + 0.42, BENCH + 0.225, -2.614);
   const mic = { group: micG, recMat, cone, head: V(mx, BENCH + 0.4, -2.46) };
+
+  mic.head.add(off('mic'));
+  cur = null;
 
   // ---------- station: mixer ----------
   const qx = SX.mix, R = 0.13, flaskY = BENCH + 0.085;
@@ -555,21 +591,53 @@ export function buildLab(canvas) {
     door: [[2.45, 1.45, 0.7], [3.6, 0.85, -2.7]],
     unbox: [[2.35, 1.65, 0.9], [3.35, 0.35, -1.3]],
   };
+  // First-person player. The scripted camera is only used behind the start menu.
+  const pl = { x: 0.3, z: 0.6, yaw: 0, pitch: -0.1 };
+  const WALLS = [ // things you cannot walk through: [x0, x1, z0, z1]
+    [-4.8, 2.6, -3.2, -2.15], [-3.4, -1.8, 0.525, 1.425], [1.4, 3.0, 1.125, 2.025], [3.45, 4.85, 1.925, 2.825],
+    [4.42, 5, -1.25, 0.05], [-5, -4.55, -0.2, 0.5], [0.6, 1.2, -1.15, -0.65], [4.35, 4.75, -2.65, -2.25], [2.7, 3.15, -3, -2.25],
+  ];
   function setView(name, snap = false) {
-    let v = VIEWS[name];
-    if (!v) {
-      const x = SX[name], portrait = camera.aspect < 1;
-      v = [[x, 1.52, portrait ? 0.15 : -0.5], [x, 1.3, -2.6]];
-    } else if (camera.aspect < 1 && (name === 'door' || name === 'unbox')) {
-      v = [[v[0][0] + 0.4, v[0][1] + 0.1, v[0][2] + 0.9], v[1]];
-    }
+    if (name !== 'menu') return;
+    rig.walk = false;
+    const v = VIEWS.menu;
     rig.tPos.set(...v[0]); rig.tLook.set(...v[1]);
     rig.yaw = 0; rig.pitch = 0;
     rig.view = name;
     if (snap) { rig.pos.copy(rig.tPos); rig.look.copy(rig.tLook); }
   }
+  function startWalk(x, z, yaw) { rig.walk = true; rig.view = 'walk'; pl.x = x; pl.z = z; pl.yaw = yaw; pl.pitch = -0.2; }
+  function move(dt, fwd, strafe) {
+    const sp = 2.4 * dt, sn = Math.sin(pl.yaw), cs = Math.cos(pl.yaw), r = 0.28;
+    pl.x += (-sn * fwd + cs * strafe) * sp; pl.z += (-cs * fwd - sn * strafe) * sp;
+    pl.x = Math.max(-4.65, Math.min(4.65, pl.x)); pl.z = Math.max(-2.7, Math.min(3.65, pl.z));
+    for (const [x0, x1, z0, z1] of WALLS) {
+      if (pl.x > x0 - r && pl.x < x1 + r && pl.z > z0 - r && pl.z < z1 + r) {
+        const d = [pl.x - (x0 - r), (x1 + r) - pl.x, pl.z - (z0 - r), (z1 + r) - pl.z];
+        const m = Math.min(...d), i = d.indexOf(m);
+        if (i === 0) pl.x = x0 - r; else if (i === 1) pl.x = x1 + r; else if (i === 2) pl.z = z0 - r; else pl.z = z1 + r;
+      }
+    }
+  }
+  function look(dx, dy) { pl.yaw -= dx; pl.pitch = Math.max(-1.2, Math.min(1.2, pl.pitch - dy)); }
+  // The station the player is standing at and facing, if any.
+  function nearStation() {
+    let best = null, bd = 1.9;
+    const fx = -Math.sin(pl.yaw), fz = -Math.cos(pl.yaw);
+    for (const id in stationPos) {
+      const dx = stationPos[id].x - pl.x, dz = stationPos[id].z - pl.z, d = Math.hypot(dx, dz);
+      if (d < bd && (dx * fx + dz * fz) / d > 0.6) { bd = d; best = id; }
+    }
+    return best;
+  }
   const dir = V(0, 0, 0), sphr = new THREE.Spherical();
   function updateCamera(dt, t) {
+    if (rig.walk) {
+      camera.position.set(pl.x, 1.6, pl.z);
+      if (rig.shake > 0.001) { camera.position.x += rs(rig.shake) * 0.05; camera.position.y += rs(rig.shake) * 0.05; rig.shake *= Math.exp(-dt * 5); }
+      camera.rotation.set(pl.pitch, pl.yaw, 0, 'YXZ');
+      return;
+    }
     const k = 1 - Math.exp(-dt * rig.speed);
     rig.pos.lerp(rig.tPos, k); rig.look.lerp(rig.tLook, k);
     camera.position.copy(rig.pos);
@@ -636,7 +704,7 @@ export function buildLab(canvas) {
   function setBloom(on) { quality.bloom = on; bloom.enabled = on; }
 
   // tap targets
-  const hits = Object.entries(SX).map(([id, x]) => ({ id, box: new THREE.Box3(V(x - 0.52, BENCH, -3), V(x + 0.52, 1.95, -2.1)) }));
+  const hits = Object.keys(SX).map((id) => { const q = stationPos[id]; return { id, box: new THREE.Box3(V(q.x - 0.52, BENCH, q.z - 0.45), V(q.x + 0.52, 1.95, q.z + 0.45)) }; });
   hits.push({ id: 'door', box: new THREE.Box3(V(3.2, 0, -3.1), V(4.2, 2.1, -2.85)) });
   const pkgHit = { id: 'pkg', box: new THREE.Box3() };
   hits.push(pkgHit);
@@ -647,7 +715,7 @@ export function buildLab(canvas) {
     let best = null, bd = 1e9;
     for (const h of hits) {
       if (h.id === 'pkg' && !pkg.visible) continue;
-      if (ray.ray.intersectBox(h.box, ip)) { const d = ip.distanceTo(camera.position); if (d < bd) { bd = d; best = h.id; } }
+      if (ray.ray.intersectBox(h.box, ip)) { const d = ip.distanceTo(camera.position); if (d < bd && (d < 3.2 || h.id === 'door' || h.id === 'pkg')) { bd = d; best = h.id; } }
     }
     return best;
   }
@@ -659,7 +727,7 @@ export function buildLab(canvas) {
   }
 
   return {
-    THREE, renderer, scene, camera, P, M, rig, setView, update, render, resize, setBloom, setLift, pick, project, quality,
+    THREE, renderer, scene, camera, P, M, rig, setView, startWalk, move, look, nearStation, stationPos, home, update, render, resize, setBloom, setLift, pick, project, quality,
     fxLight, flame, flamePos, tongs, nozzle, zap, tank, mic, mixer, door, doorHandle, pack, burstPeanuts,
     makeSample, makeBalloon, floaters, BENCH, sample: null,
     shake(a) { rig.shake = Math.max(rig.shake, a); },

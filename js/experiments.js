@@ -14,7 +14,7 @@ const lerp = (a, b, k) => a + (b - a) * k;
 export function createExperiments(L, ui) {
   const { P, scene } = L;
 
-  const samplePos = (id) => V(STATION_X[id] + (id === 'water' ? -0.57 : -0.36), L.BENCH, id === 'water' ? -2.3 : -2.35);
+  const samplePos = (id) => V(L.stationPos[id].x + (id === 'water' ? -0.57 : -0.36), L.BENCH, L.stationPos[id].z + (id === 'water' ? 0.25 : 0.2));
   const valve = () => L.sample.localToWorld(L.sample.userData.valve.clone());
 
   function setSample(z) {
@@ -27,7 +27,8 @@ export function createExperiments(L, ui) {
     scene.add(L.sample);
     return L.sample;
   }
-  function placeSample(z, id) { setSample(z).position.copy(samplePos(id)); }
+  function placeSample(z) { setSample(z).position.copy(L.home); }
+  function toHome() { sfx.whoosh(); return arc(L.sample, L.home, 1.1, 0.6); }
   async function bring(id) {
     const tgt = samplePos(id);
     if (L.sample.position.distanceTo(tgt) > 0.05) { sfx.tap(); await arc(L.sample, tgt, 0.6, 0.4); }
@@ -100,7 +101,7 @@ export function createExperiments(L, ui) {
     const p0 = b.position.clone();
     const keep = (f) => { L.floaters.push(f); if (L.floaters.length > 12) scene.remove(L.floaters.shift().b); };
     if (r.fx === 'float') {
-      const tx = N.x + rs(0.7), tz = -2.3 + rnd(0.45), ty = 3.2 - 0.46;
+      const tx = N.x + rs(0.7), tz = N.z + 0.2 + rnd(0.45), ty = 3.2 - 0.46;
       L.rig.tLook.y = 2.1;
       await anim(r.slow ? 3.6 : 1.8, (e) => b.position.set(lerp(p0.x, tx, e), lerp(p0.y, ty, e), lerp(p0.z, tz, e)), r.slow ? ease.io : ease.in);
       sfx.tap();
@@ -108,14 +109,14 @@ export function createExperiments(L, ui) {
       await wait(0.9);
       L.rig.tLook.y = 1.3;
     } else if (r.fx === 'hover') {
-      const c = V(N.x + 0.5, 1.95, -1.8);
+      const c = V(N.x + 0.5, 1.95, N.z + 0.7);
       L.rig.tLook.y = 1.7;
       await anim(2.2, (e) => b.position.lerpVectors(p0, c, e));
       keep({ b, mode: 'hover', x: c.x, y: c.y, z: c.z, ph: 0 });
       await wait(0.8);
       L.rig.tLook.y = 1.3;
     } else if (r.fx === 'sink') {
-      const tgt = V(N.x + rs(0.5), 0, -1.5 + rs(0.2));
+      const tgt = V(N.x + rs(0.5), 0, N.z + 1.0 + rs(0.2));
       sfx.trombone();
       L.rig.tLook.y = 0.9;
       await arc(b, tgt, 2.2, 0.25, ease.lin);
@@ -137,7 +138,7 @@ export function createExperiments(L, ui) {
       scene.remove(b);
       sfx.pop();
     } else { // rock
-      const tgt = V(N.x + 0.12, 0, -1.65);
+      const tgt = V(N.x + 0.12, 0, N.z + 0.85);
       L.rig.tLook.y = 0.8;
       await arc(b, tgt, 0.65, 0.08, ease.in);
       sfx.thud(); L.shake(0.7);
@@ -513,5 +514,5 @@ export function createExperiments(L, ui) {
     });
   }
 
-  return { run, mix, deliver, placeSample, samplePos, bring };
+  return { run, mix, deliver, placeSample, samplePos, bring, toHome };
 }

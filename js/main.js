@@ -97,7 +97,7 @@ function buildTable() {
 }
 function sizeTable() {
   const w = window.innerWidth, h = window.innerHeight;
-  const cell = Math.max(36, Math.min(66, Math.floor((w - 40) / 18) - 3, Math.floor((h - 190) / 9.3) - 3));
+  const cell = Math.max(36, Math.min(76, Math.floor((w - 40) / 18) - 3, Math.floor((h - 190) / 9.3) - 3));
   $('grid').style.setProperty('--cell', cell + 'px');
 }
 function nextUp() {
@@ -393,6 +393,9 @@ const endDrag = (e) => {
 };
 canvas.addEventListener('pointerup', endDrag);
 canvas.addEventListener('pointercancel', () => { drag = null; });
+
+// iPad Safari: stop pinch-zoom and double-tap zoom from hijacking the game
+['gesturestart', 'gesturechange', 'dblclick'].forEach((ev) => document.addEventListener(ev, (e) => e.preventDefault(), { passive: false }));
 
 // ---------- boot + loop ----------
 let pixelCap = Math.min(window.devicePixelRatio || 1, 2);

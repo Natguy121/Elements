@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Elements Lab</title>
+<meta name="theme-color" content="#0b1013">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=DM+Mono:wght@400;500&family=Figtree:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/addons/" } }
+</script>
+</head>
+<body>
+<!--APP-->
+<div id="app">
+  <canvas id="gl" aria-label="The laboratory"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+  <div id="fxTint" class="fx"></div>
+  <div id="fxSoot" class="fx"></div>
+  <div id="fxFlash" class="fx"></div>
+
+  <section id="menu" class="screen menu">
+    <div class="menu-inner">
+      <p class="eyebrow">A mostly safe science experience</p>
+      <h1 class="logo">Elements</h1>
+      <div class="stripes" aria-hidden="true"></div>
+      <p class="tagline">118 elements. One lab. Zero remaining eyebrows.</p>
+      <div class="menu-actions">
+        <button id="btnPlay" class="btn primary big" type="button">Play</button>
+        <button id="btnSound" class="btn" type="button">Sound: on</button>
+        <button id="btnReset" class="btn" type="button">Reset progress</button>
+      </div>
+      <p class="fine">No elements were harmed in the making of this game. Several were annoyed. Do not try any of this at home, at school, or anywhere with a ceiling.</p>
+    </div>
+  </section>
+
+  <section id="table" class="screen table" hidden>
+    <header class="t-head">
+      <button id="btnMenu" class="btn small" type="button">Menu</button>
+      <div class="t-title">
+        <h2>Pick an element</h2>
+        <p id="tProgress"></p>
+      </div>
+    </header>
+    <div class="t-scroll" id="tScroll"><div id="grid" class="grid"></div></div>
+    <p class="t-hint" id="tHint">Finish three experiments with an element to unlock the next one.</p>
+  </section>
+
+  <div id="hud" class="hud" hidden>
+    <div class="hud-top">
+      <button id="btnBack" class="btn small" type="button">Table</button>
+      <div class="chip" id="chip"><b id="chipSym">H</b><span><i id="chipNum">1</i><em id="chipName">Hydrogen</em></span></div>
+      <span class="grow"></span>
+      <button id="btnWide" class="btn small" type="button">Wide view</button>
+      <button id="btnSnd2" class="btn small" type="button" aria-label="Toggle sound">Sound</button>
+    </div>
+    <ol id="tasks" class="tasks"></ol>
+    <button id="marker" class="marker" type="button" hidden><span class="ring"></span><b id="markerText">Open the door</b></button>
+    <div id="bubble" class="bubble" hidden></div>
+    <div class="hud-bottom">
+      <div class="caption" id="caption"><span class="who">Lab notes</span><p id="capText"></p></div>
+      <nav id="dock" class="dock" aria-label="Lab stations"></nav>
+    </div>
+  </div>
+
+  <div id="mixPanel" class="modal" hidden>
+    <div class="card">
+      <h3>The mixer</h3>
+      <p class="sub">Pick two elements you have unboxed. Results may vary. Results may explode.</p>
+      <div class="slots"><span id="slotA" class="slot">?</span><span class="plus">+</span><span id="slotB" class="slot">?</span></div>
+      <div id="mixGrid" class="mix-grid"></div>
+      <p id="mixCount" class="sub"></p>
+      <div id="mixFound" class="found"></div>
+      <div class="card-actions">
+        <button id="mixCancel" class="btn" type="button">Close</button>
+        <button id="mixGo" class="btn primary" type="button" disabled>Mix them</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="unlock" class="modal" hidden>
+    <div class="card unlock-card">
+      <div id="confetti" class="confetti" aria-hidden="true"></div>
+      <p class="eyebrow" id="unlockEyebrow">Experiments complete</p>
+      <div class="unlock-tile" id="unlockTile"><i id="unlockNum">2</i><b id="unlockSym">He</b></div>
+      <h3 id="unlockTitle">Helium unlocked</h3>
+      <p class="sub" id="unlockText"></p>
+      <div class="card-actions">
+        <button id="unlockStay" class="btn" type="button">Keep experimenting</button>
+        <button id="unlockGo" class="btn primary" type="button">Periodic table</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirm" class="modal" hidden>
+    <div class="card">
+      <h3>Reset everything?</h3>
+      <p class="sub">All unlocked elements and discovered compounds go back in the box. The eyebrows stay gone.</p>
+      <div class="card-actions">
+        <button id="confirmNo" class="btn" type="button">Keep my progress</button>
+        <button id="confirmYes" class="btn primary" type="button">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+  <div id="loading" class="loading"><span>Calibrating beakers…</span></div>
+</div>
+<!--/APP-->
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

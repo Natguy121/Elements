@@ -1,0 +1,14 @@
+{
+  "name": "elements-lab",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A comedy science game: unlock the periodic table one delivery at a time.",
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "build": "node tools/build.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

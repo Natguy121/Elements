@@ -53,7 +53,7 @@ One file, two parts. **Part 1** is the game this repo builds, Elements Lab. Ever
 | Grab an object | Click it | Tap it |
 | Drop a held object | Click again, or E | Tap again |
 | Throw a held object | F, or right-click | Throw button (appears while holding) |
-| Open the mixer | Mixer dock button is hidden; use the HUD where shown | Same |
+| Use the mixer | Carry your sample to the flask on the back bench | Same |
 
 Notes:
 - The thumbstick appears where the left thumb touches, in the lower-left 40% of the width and the lower 65% of the height. It has a 56-pixel travel limit; the stick is full at that distance.
@@ -61,7 +61,7 @@ Notes:
 - Pinch zoom, double-tap zoom and the context menu are blocked on the canvas.
 - Looking up and down is clamped to pitch between -1.2 and 1.2 radians (about -69° to 69°).
 - Yaw is unlimited; the view can turn all the way round.
-- Walking speed: 2.4 m/s. Movement uses both axes at once; diagonal movement is normalised to 1.0 in total magnitude.
+- Walking speed: 2.4 m/s per axis. Diagonal movement is not normalised, so walking forward and sideways at once is about 1.4 times faster.
 - The camera stands at eye height 1.45 m.
 
 ## Physics and feel
@@ -108,12 +108,11 @@ Stations are unlabelled, and their order in the room is not a sequence. Each has
 | Mixer | 2.0, -2.55 | 0.28 | flask neck | Mixes two elements |
 | Liquid nitrogen dewar | -4.2, -1.1 | 0.34 | 1.0 m high, over the dewar | Cold reactions |
 
-The mixer and the liquid nitrogen dewar are not sample stations for the three discoveries. The mixer uses the two elements you select. The dewar is a station and counts as a discovery only if the element lists `cryo` among its tasks; check the element details.
+Liquid nitrogen is never one of the three discoveries. The mixer uses the two elements you select. Each element discoveries come from the balloon, burner, zapper, tank and microphone stations.
 
 Station behaviour common to all:
 - Activation is blocked while the mixer panel or the unlock popup is open, and while another reaction is still playing.
-- A reaction takes between about 3 and 10 seconds.
-- A sample returns to the trolley after a cryo reaction, and is carried back by its own motion otherwise.
+- After a cryo reaction the sample is returned to the trolley.
 - Each reaction shows a caption in the lab notes box, and a toast when a discovery is made.
 
 ## Element index
@@ -682,7 +681,7 @@ Effect names and what they do on screen:
 
 ## Liquid nitrogen
 
-Each element 1 to 18 has its own cryo line. The sample is lowered into a cold fog for about two seconds, then raised back up. Cold reactions do not count as discoveries unless the element lists `cryo` among its tasks.
+Each element 1 to 18 has its own cryo line. The sample is lowered into a cold fog, held for about 1.3 seconds, then raised and returned to the trolley. Cryo is not one of the three discoveries.
 
 ## Loose objects
 
@@ -704,7 +703,7 @@ These can be grabbed, carried, thrown, dunked, burnt, zapped, frozen and broken.
 | Fire extinguisher | metal | 0.13 | wall, pinned |
 | Party balloons (5) | balloon | 0.2 | ceiling area, pinned until grabbed |
 | Rubber duck | rubber | 0.05 | in the tank |
-| Sample | glass or metal, by form | 0.08 solid, 0.13 gas | trolley |
+| Sample | metal (in the physics model), any form | 0.08 solid, 0.13 gas | trolley |
 
 Object types and how they react:
 
@@ -724,7 +723,7 @@ Object types and how they react:
 - Zapping metal sparks; zapping other things does nothing.
 - Putting an object in the mic zone squeaks for a duck and does nothing for others.
 - Water entry plays a splash and a spray of droplets.
-- Each object reaction has a one-time caption: repeated reactions are silenced for that object type within the same visit.
+- Object captions are one-time per page load: once an object type has said its line, it stays quiet for the rest of that page load.
 
 ## Scene: props, lights and animation
 
@@ -739,7 +738,7 @@ Object types and how they react:
 - **Dewar:** the liquid nitrogen flask emits fog particles about 7 times a second.
 - **Mixer:** the liquid rotates slowly, and small bubbles rise while it is in use.
 - **Balloons:** party balloons sway, and their strings are attached to a weight.
-- **Shelves:** wall shelves hold about 10 to 15 bottles, beakers and books each, with random types and fills.
+- **Shelves:** two wall shelves with bottles, beakers and books, in random order.
 - **Posters and signs:** a periodic table poster, a whiteboard with jokes, a "SAFETY THIRD" sign, a "DELIVERIES" sign and a "FLAMMABLE" sign on the cabinet.
 - **Fire extinguisher:** a red cylinder with an "EMPTY (AGAIN)" tag.
 - **Film grain:** an animated grain overlay over the whole screen.

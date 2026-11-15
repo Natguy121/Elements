@@ -11,9 +11,12 @@ It runs in any modern browser, on phones and desktops, with no install.
 3. **The lab** – a 3D lab with a bench full of equipment.
    - Open the door, a labelled package is delivered (thrown), open it to get your sample.
    - Walk around freely. Touch: left thumb is a walk stick, the rest of the screen looks. Desktop: WASD + drag.
-   - Equipment is spread around the room and nothing tells you what to use: a balloon rig, a burner, a high-voltage tube, a water tank, a microphone and a mixer. Walk up to something and tap it (or press the button that appears) to try your sample on it.
-   - Each element has three hidden discoveries, shown as `???` until you find them. Every station reacts to every element, so the rest are there for fun.
+   - Pick up anything: tap an object to grab it with your beam, tap again to drop it, or throw it. Glass breaks, balloons float, the duck squeaks.
+   - Carry your sample to equipment to see what happens: a balloon rig, a burner, a high-voltage tube, a water tank, a microphone, a liquid nitrogen dewar and a mixer. Nothing tells you which three count; they show as `???` until you find them.
+   - Other objects react too: burn them, dunk them, zap them, or freeze them and then drop them.
 4. **Mixing** – once you own two elements, the Mixer combines any pair. There are 34 real compounds to discover (water, table salt, laughing gas, …) and a lot of awkward silences.
+
+**Multiplayer** – when the game is opened as a shared Claude artifact, everyone with it open appears in the lab as a small robot. You see each other move, carry and throw things. Served anywhere else it is single-player.
 
 Progress is saved in the browser.
 
@@ -48,6 +51,9 @@ npm run build        # writes dist/elements.html
 | `js/data.js` | All elements, experiments, jokes and mixer recipes |
 | `js/lab.js` | The 3D lab: room, bench, stations, door, delivery box |
 | `js/experiments.js` | What each station does, the delivery sequence, the mixer |
+| `js/grab.js` | Loose-object physics and the grab beam |
+| `js/robot.js` | The player robot |
+| `js/net.js` | Multiplayer presence |
 | `js/fx.js` | Tween engine and particle system |
 | `js/textures.js` | Every texture, painted on canvas at start-up |
 | `js/audio.js` | Every sound, synthesised with WebAudio |

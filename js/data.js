@@ -299,6 +299,28 @@ export const CONTENT = {
   },
 };
 
+const CRYO = [
+  'At −253 °C hydrogen finally turns liquid. Your nitrogen only reaches −196. It stays a gas and stays smug.',
+  'Helium needs −269 °C to turn liquid, the coldest of anything. Liquid nitrogen is a warm bath to it.',
+  'It is now a very cold soft metal. Still soft. Still has trust issues.',
+  'Cold beryllium. Just as toxic, now with frostbite.',
+  'Frosty boron. It did not notice.',
+  'Cold carbon. It does not care. It has been through worse inside stars.',
+  'You dipped nitrogen in nitrogen. It condensed into more of the same. Peak efficiency.',
+  'Oxygen turns into a pale blue liquid at −183 °C, and that liquid is magnetic. Really.',
+  'Fluorine becomes a yellow liquid at −188 °C. It is still angry, just slower.',
+  'Neon holds out until −246 °C. It stays a gas and keeps glowing about it.',
+  'Cold sodium. For once it is not exploding. Enjoy the quiet.',
+  'Frozen magnesium. Still waiting for someone to bring a flame.',
+  'Aluminium gets stronger when it is cold. That is why rockets use it for fuel tanks.',
+  'Chilled silicon. Computer chips love this. Some people do it to theirs for fun.',
+  'Cold slows phosphorus down. It has stopped smoking. Do not trust it.',
+  'Frozen sulfur goes brittle and snaps like chalk.',
+  'Chlorine turns into a yellow-green liquid at −34 °C. It was the first gas anyone ever liquefied.',
+  'Argon liquefies at −186 °C, so it actually condensed. The laziest element did something.',
+];
+CRYO.forEach((text, i) => { CONTENT[i + 1].r.cryo = { text }; });
+
 export const MAX_PLAYABLE = 18;
 
 export function taskName(z, station) {

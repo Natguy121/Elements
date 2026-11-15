@@ -23,6 +23,7 @@
 <div id="app">
   <canvas id="gl" aria-label="The laboratory"></canvas>
   <div class="vignette" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
   <div id="fxTint" class="fx"></div>
   <div id="fxSoot" class="fx"></div>
   <div id="fxFlash" class="fx"></div>
@@ -59,6 +60,7 @@
       <button id="btnBack" class="btn small" type="button">Table</button>
       <div class="chip" id="chip"><b id="chipSym">H</b><span><i id="chipNum">1</i><em id="chipName">Hydrogen</em></span></div>
       <span class="grow"></span>
+      <span id="players" class="chip players" hidden></span>
       <button id="btnWide" class="btn small" type="button">Wide view</button>
       <button id="btnSnd2" class="btn small" type="button" aria-label="Toggle sound">Sound</button>
     </div>
@@ -67,7 +69,7 @@
     <div id="bubble" class="bubble" hidden></div>
     <div id="joy" class="joy" hidden><i></i></div>
     <div class="hud-bottom">
-      <button id="btnUse" class="btn primary use" type="button" hidden>Try the sample here</button>
+      <button id="btnUse" class="btn primary use" type="button" hidden>Throw</button>
       <div class="caption" id="caption"><span class="who">Lab notes</span><p id="capText"></p></div>
       <nav id="dock" class="dock" aria-label="Lab stations"></nav>
     </div>

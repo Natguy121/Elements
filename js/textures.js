@@ -193,9 +193,6 @@ export function clockTex() {
   g.fillStyle = '#fafafa'; g.beginPath(); g.arc(128, 128, 124, 0, 7); g.fill();
   g.strokeStyle = '#111'; g.lineWidth = 6;
   for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; g.beginPath(); g.moveTo(128 + Math.cos(a) * 100, 128 + Math.sin(a) * 100); g.lineTo(128 + Math.cos(a) * 114, 128 + Math.sin(a) * 114); g.stroke(); }
-  g.lineWidth = 8; g.lineCap = 'round';
-  g.beginPath(); g.moveTo(128, 128); g.lineTo(170, 96); g.stroke();
-  g.lineWidth = 5; g.beginPath(); g.moveTo(128, 128); g.lineTo(120, 40); g.stroke();
   return tex(c);
 }
 

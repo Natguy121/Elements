@@ -7,6 +7,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import * as T from './textures.js';
 import { CONTENT } from './data.js';
 import { Particles, rnd, rs } from './fx.js';
+import { makeRobot, animateRobot } from './robot.js';
 
 // Builds the whole lab: room, bench, six stations, door, delivery box, clutter.
 // Everything is procedural geometry with physically based materials.
@@ -42,9 +43,10 @@ export function buildLab(canvas) {
   // ---------- materials ----------
   const std = (o) => new THREE.MeshStandardMaterial(o);
   const phys = (o) => new THREE.MeshPhysicalMaterial(o);
+  const wallT = T.wallTex(), floorT = T.floorTex(8, 7.6);
   const M = {
-    wall: std({ map: T.wallTex(), color: 0xdfe7e5, roughness: 0.93 }),
-    floor: std({ map: T.floorTex(8, 7.6), roughness: 0.3 }),
+    wall: std({ map: wallT, bumpMap: wallT, bumpScale: 0.5, color: 0xd6dcda, roughness: 0.9 }),
+    floor: std({ map: floorT, bumpMap: floorT, bumpScale: 0.7, roughnessMap: floorT, roughness: 0.5, envMapIntensity: 1.4 }),
     ceiling: std({ color: 0xeceeed, roughness: 1 }),
     benchTop: std({ color: 0x131618, roughness: 0.2 }),
     cabinet: std({ color: 0xe6ebea, roughness: 0.42 }),
@@ -59,7 +61,7 @@ export function buildLab(canvas) {
     red: phys({ color: 0xc8201c, roughness: 0.3, clearcoat: 0.7 }),
     yellow: phys({ color: 0xffc21a, roughness: 0.35, clearcoat: 0.5 }),
     wood: std({ color: 0xcdb48a, roughness: 0.6 }),
-    door: std({ color: 0x4f7f86, roughness: 0.45 }),
+    door: std({ color: 0x6a777d, roughness: 0.45 }),
     panelLight: std({ color: 0xffffff, emissive: 0xfff6e8, emissiveIntensity: 2.6 }),
     glass: phys({ color: 0xffffff, roughness: 0.03, transmission: 1, thickness: 0.012, ior: 1.5, side: THREE.DoubleSide, envMapIntensity: 1.4 }),
     amber: phys({ color: 0xa65e1c, roughness: 0.06, transmission: 0.85, thickness: 0.05, ior: 1.5, envMapIntensity: 1.3 }),
@@ -85,6 +87,7 @@ export function buildLab(canvas) {
   const group = (x = 0, y = 0, z = 0, p = cur || scene) => { const g = new THREE.Group(); g.position.set(x, y, z); p.add(g); return g; };
   const tube = (pts, r, mat, p = cur || scene) => add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map((q) => V(...q))), 24, r, 8), mat, 0, 0, 0, p);
 
+  const flickMat = std({ color: 0xffffff, emissive: 0xfff6e8, emissiveIntensity: 2.6 });
   // ---------- room ----------
   const floor = plane(10.3, 9.8, M.floor, 0, 0, -0.75);
   floor.rotation.x = -Math.PI / 2;
@@ -100,7 +103,7 @@ export function buildLab(canvas) {
   box(0.02, 0.1, 7, M.dark, -4.99, 0.05, 0.5);
   box(0.02, 0.1, 7, M.dark, 4.99, 0.05, 0.5);
   [[-3, -0.9], [0.2, -0.9], [-3, 1.6], [0.2, 1.6], [3.4, 0.4]].forEach(([x, z]) => {
-    noShadow(box(1.5, 0.03, 0.5, M.panelLight, x, 3.19, z));
+    noShadow(box(1.5, 0.03, 0.5, x > 3 ? flickMat : M.panelLight, x, 3.19, z));
     box(1.6, 0.04, 0.6, M.steel, x, 3.2, z);
   });
   // hallway behind the door
@@ -175,8 +178,8 @@ export function buildLab(canvas) {
 
   // ---------- shelves + clutter ----------
   const shelfMat = std({ color: 0xf1f1ee, roughness: 0.5 });
-  const liquids = [0x2f9bff, 0xff4f7a, 0x39d98a, 0xffc21a, 0x9b5cff, 0xff7a1a, 0x14c8c8];
-  const bookCols = [0x9c2f2f, 0x2f5f9c, 0x2f8a5a, 0xc9a13a, 0x5a3f8a, 0x444a50];
+  const liquids = [0xbfd9e6, 0x9fb9c9, 0xc9a86a, 0xdfe7ea, 0x7f99a8, 0xb98d4f, 0xcfd8dc];
+  const bookCols = [0x3a4652, 0x55606a, 0x6b6558, 0x2f3a44, 0x7a7468, 0x444a50];
   [1.93, 2.42].forEach((y, row) => {
     box(4.9, 0.035, 0.3, shelfMat, -2.3, y, -2.85);
     [-4.5, -2.3, -0.1].forEach((x) => box(0.02, 0.1, 0.24, M.steel, x, y - 0.065, -2.87));
@@ -187,7 +190,7 @@ export function buildLab(canvas) {
       const yy = y + 0.018, zz = -2.85 + rs(0.03);
       if (kind === 0 || kind === 3) { const r = rnd(0.035, 0.05); place(bottle(rnd(0.17, 0.25), r, M.amber, 0x2a1705), x + r, yy, zz); x += r * 2 + 0.03; }
       else if (kind === 1) { place(erlen(rnd(0.15, 0.2), 0.06, liquids[i % 7], rnd(0.3, 0.7)), x + 0.06, yy, zz); x += 0.15; }
-      else if (kind === 2) { place(bottle(rnd(0.16, 0.24), 0.042, M.glass, liquids[(i + 3) % 7], M.red), x + 0.045, yy, zz); x += 0.12; }
+      else if (kind === 2) { place(bottle(rnd(0.16, 0.24), 0.042, M.glass, liquids[(i + 3) % 7], M.plastic), x + 0.045, yy, zz); x += 0.12; }
       else if (kind === 4) { place(beaker(rnd(0.1, 0.14), 0.05, liquids[(i + 5) % 7], rnd(0.3, 0.7)), x + 0.05, yy, zz); x += 0.13; }
       else { // a few books, one leaning
         for (let b = 0; b < 4; b++) {
@@ -210,19 +213,41 @@ export function buildLab(canvas) {
     noShadow(lathe([[0, 0], [0.011, 0.008], [0.012, 0.15], [0.014, 0.152]], M.glass, -0.09 + i * 0.045, 0.014, 0, rack, 16));
     cyl(0.009, 0.009, 0.04 + (i % 3) * 0.025, liquid(liquids[i]), -0.09 + i * 0.045, 0.04 + (i % 3) * 0.0125, 0, rack, 12);
   }
-  place(beaker(0.13, 0.05, 0x39d98a, 0.6), -3.4, BENCH, -2.62, 0.3);
-  place(erlen(0.19, 0.065, 0x9b5cff, 0.5), -2.2, BENCH, -2.82);
-  place(beaker(0.09, 0.035, 0xff7a1a, 0.4), -2.32, BENCH, -2.68);
-  place(erlen(0.15, 0.05, 0x2f9bff, 0.55), 0.3, BENCH, -2.84);
-  place(beaker(0.14, 0.055, 0xff4f7a, 0.35), 0.18, BENCH, -2.36);
-  place(bottle(0.22, 0.045, M.amber, 0x2a1705), 2.46, BENCH, -2.85);
-  place(erlen(0.16, 0.055, 0xffc21a, 0.6), 2.42, BENCH, -2.4);
+  // Loose props: everything registered here can be picked up, thrown, dunked, burnt, frozen or broken.
+  const props = [];
+  const prop = (obj, o) => { props.push([obj, o]); return obj; };
+  const GL = (r) => ({ r, kind: 'glass', fragile: true, name: 'glassware' });
+  prop(place(beaker(0.13, 0.05, 0xbfd9e6, 0.6), -3.4, BENCH, -2.62, 0.3), GL(0.065));
+  prop(place(erlen(0.19, 0.065, 0xc9a86a, 0.5), -2.2, BENCH, -2.82), GL(0.085));
+  prop(place(beaker(0.09, 0.035, 0xdfe7ea, 0.4), -2.32, BENCH, -2.68), GL(0.045));
+  prop(place(erlen(0.15, 0.05, 0x9fb9c9, 0.55), 0.3, BENCH, -2.84), GL(0.07));
+  prop(place(beaker(0.14, 0.055, 0xcfd8dc, 0.35), 0.18, BENCH, -2.36), GL(0.07));
+  prop(place(bottle(0.22, 0.045, M.amber, 0x2a1705), 2.46, BENCH, -2.85), GL(0.09));
+  prop(place(erlen(0.16, 0.055, 0xc9a86a, 0.6), 2.42, BENCH, -2.4), GL(0.075));
+  prop(place(beaker(0.12, 0.05, 0x9fb9c9, 0.5), -2.0, BENCH, 1.2), GL(0.06));
+  prop(place(erlen(0.17, 0.06, 0xdfe7ea, 0.4), -3.2, BENCH, 0.75), GL(0.08));
+  prop(place(beaker(0.11, 0.045, 0xc9a86a, 0.6), 2.8, BENCH, 1.85), GL(0.055));
+  prop(place(bottle(0.2, 0.042, M.amber, 0x2a1705), 1.56, BENCH, 1.3), GL(0.085));
+  prop(place(erlen(0.16, 0.055, 0xbfd9e6, 0.5), 3.62, BENCH, 2.62), GL(0.075));
+  prop(place(beaker(0.13, 0.055, 0xdfe7ea, 0.3), -0.9, BENCH, -2.38), GL(0.065));
+  prop(place(bottle(0.24, 0.05, M.glass, 0x9fb9c9), 1.25, BENCH, -2.42), GL(0.1));
+  // books, weights, boxes, a cannonball nobody will explain
+  const bookAt = (x, y, z, ry, c) => { const g = group(x, y, z); g.rotation.y = ry; box(0.23, 0.036, 0.16, std({ color: c, roughness: 0.75 }), 0, 0.018, 0, g); box(0.22, 0.028, 0.15, M.ceramic, 0.004, 0.018, 0, g); prop(g, { r: 0.05, kind: 'paper', name: 'book' }); };
+  bookAt(4.62, BENCH, 2.18, 0.2, 0x3a4652); bookAt(4.62, BENCH + 0.037, 2.18, -0.1, 0x6b6558); bookAt(4.62, BENCH + 0.074, 2.18, 0.35, 0x2f3a44);
+  bookAt(-0.2, BENCH, -2.8, 0.5, 0x55606a); bookAt(-3.1, BENCH, 1.25, -0.4, 0x7a7468);
+  [[2.75, 1.32, 0.03], [2.86, 1.36, 0.024], [2.8, 1.25, 0.018]].forEach(([x, z, r]) => { const g = group(x, BENCH, z); cyl(r, r * 1.05, r * 2, M.brass, 0, r, 0, g); cyl(r * 0.4, r * 0.4, r * 0.5, M.brass, 0, r * 2.2, 0, g); prop(g, { r: r * 1.3, kind: 'metal', name: 'brass weight' }); });
+  const ball = group(-0.4, 0, -1.9); sph(0.1, std({ color: 0x2a2d31, metalness: 1, roughness: 0.45 }), 0, 0.1, 0, ball); prop(ball, { r: 0.1, kind: 'metal', name: 'cannonball' });
+  const cardM = std({ map: T.cardboardTex(true), roughness: 0.85 });
+  [[4.45, 0, 0.62, 0.1], [4.42, 0, 1.2, -0.15], [4.46, 0.36, 0.9, 0.3]].forEach(([x, y, z, ry]) => { const g = group(x, y, z); g.rotation.y = ry; box(0.46, 0.36, 0.4, cardM, 0, 0.18, 0, g); prop(g, { r: 0.18, kind: 'paper', name: 'cardboard box' }); });
+  const pot = group(3.68, BENCH, 2.15); cyl(0.06, 0.045, 0.09, std({ color: 0x8a5a44, roughness: 0.85 }), 0, 0.045, 0, pot); sph(0.05, std({ color: 0x5c7a5a, roughness: 0.8 }), 0, 0.14, 0, pot).scale.set(1, 1.5, 1); prop(pot, { r: 0.08, kind: 'ceramic', fragile: true, name: 'cactus' });
+  const clip = group(1.9, BENCH, 1.75); clip.rotation.y = 0.4; box(0.2, 0.01, 0.28, std({ color: 0x5a4632, roughness: 0.7 }), 0, 0.005, 0, clip); box(0.18, 0.004, 0.25, M.ceramic, 0, 0.012, -0.005, clip); box(0.08, 0.016, 0.03, M.steel, 0, 0.018, 0.125, clip); prop(clip, { r: 0.04, kind: 'paper', name: 'clipboard' });
   // mug
   const mug = group(-1.02, BENCH, -2.86);
-  cyl(0.04, 0.036, 0.09, M.red, 0, 0.045, 0, mug);
+  cyl(0.04, 0.036, 0.09, M.ceramic, 0, 0.045, 0, mug);
   cyl(0.034, 0.034, 0.004, std({ color: 0x1c0f08, roughness: 0.15 }), 0, 0.086, 0, mug);
-  const handle = add(new THREE.TorusGeometry(0.026, 0.007, 10, 20, Math.PI), M.red, 0.04, 0.045, 0, mug);
+  const handle = add(new THREE.TorusGeometry(0.026, 0.007, 10, 20, Math.PI), M.ceramic, 0.04, 0.045, 0, mug);
   handle.rotation.z = -Math.PI / 2;
+  prop(mug, { r: 0.05, kind: 'ceramic', fragile: true, name: 'mug' });
   // microscope
   const ms = group(1.48, BENCH, -2.82);
   ms.rotation.y = -0.5;
@@ -232,15 +257,18 @@ export function buildLab(canvas) {
   const scopeTube = cyl(0.018, 0.018, 0.16, M.darkSteel, 0, 0.26, -0.01, ms); scopeTube.rotation.x = 0.5;
   cyl(0.012, 0.016, 0.04, M.steel, 0, 0.165, 0.035, ms);
   cyl(0.022, 0.022, 0.03, M.plastic, 0, 0.335, -0.052, ms).rotation.x = 0.5;
+  prop(ms, { r: 0.13, kind: 'metal', name: 'microscope' });
   // fire extinguisher, bin
   const ext = group(2.92, 0.95, -2.9);
   cyl(0.075, 0.075, 0.42, M.red, 0, 0, 0, ext); sph(0.075, M.red, 0, 0.21, 0, ext);
   cyl(0.02, 0.02, 0.08, M.dark, 0, 0.3, 0, ext); box(0.1, 0.02, 0.03, M.dark, 0.03, 0.35, 0, ext);
   const tag = plane(0.13, 0.1, std({ map: T.signTex(['EMPTY', '(AGAIN)'], '#fff8d8', '#b01818', 256, 200), roughness: 0.8 }), 0, 0.0, 0.078, ext);
   tag.rotation.z = -0.12;
+  prop(ext, { r: 0.13, base: 0.21, kind: 'metal', pinned: true, name: 'fire extinguisher' });
   const bin = group(2.92, 0, -2.45);
   cyl(0.15, 0.12, 0.34, M.darkSteel, 0, 0.17, 0, bin, 24, true).material = std({ color: 0x4b5157, metalness: 1, roughness: 0.42, side: THREE.DoubleSide });
   for (let i = 0; i < 5; i++) add(new THREE.IcosahedronGeometry(0.05, 0), M.ceramic, rs(0.06), 0.27 + rnd(0.07), rs(0.06), bin).rotation.set(rnd(3), rnd(3), 0);
+  prop(bin, { r: 0.16, kind: 'metal', name: 'bin' });
   // whiteboard, clock, signs, poster
   box(1.94, 1.08, 0.03, M.steel, 1.4, 1.95, -2.985);
   plane(1.86, 1.0, std({ map: T.whiteboardTex(), roughness: 0.25 }), 1.4, 1.95, -2.968);
@@ -248,13 +276,61 @@ export function buildLab(canvas) {
   box(0.1, 0.03, 0.04, M.dark, 1.1, 1.425, -2.955); cyl(0.008, 0.008, 0.11, M.red, 1.5, 1.42, -2.95).rotation.z = 1.57;
   const clock = cyl(0.17, 0.17, 0.03, M.dark, 2.78, 2.62, -2.98); clock.rotation.x = Math.PI / 2;
   add(new THREE.CircleGeometry(0.155, 40), std({ map: T.clockTex(), roughness: 0.4 }), 2.78, 2.62, -2.963);
+  const hands = [[0.075, 0.012], [0.115, 0.008], [0.125, 0.003]].map(([len, w], i) => {
+    const h = group(2.78, 2.62, -2.96 + i * 0.002);
+    box(w, len, 0.002, i === 2 ? M.red : M.dark, 0, len / 2 - 0.012, 0, h);
+    return h;
+  });
+  // ceiling fan
+  const fan = group(-1.3, 3.2, 0.5);
+  cyl(0.015, 0.015, 0.22, M.darkSteel, 0, -0.11, 0, fan);
+  const rotor = group(0, -0.24, 0, fan);
+  cyl(0.09, 0.09, 0.06, M.darkSteel, 0, 0, 0, rotor);
+  for (let i = 0; i < 4; i++) { const b = box(0.62, 0.012, 0.13, std({ color: 0xdfe3e2, roughness: 0.5 }), 0, 0, 0, group(0, 0, 0, rotor)); b.position.x = 0.4; b.rotation.x = 0.14; b.parent.rotation.y = i * Math.PI / 2; }
+  // monitor with a live trace, where the microphone used to be
+  const scopeCv = document.createElement('canvas'); scopeCv.width = 256; scopeCv.height = 160;
+  const scopeG = scopeCv.getContext('2d');
+  const scopeTex = new THREE.CanvasTexture(scopeCv); scopeTex.colorSpace = THREE.SRGBColorSpace;
+  const mon = group(0.8, BENCH, -2.74);
+  box(0.2, 0.015, 0.14, M.plastic, 0, 0.008, 0, mon); box(0.03, 0.14, 0.03, M.plastic, 0, 0.08, -0.03, mon);
+  box(0.46, 0.3, 0.03, M.plastic, 0, 0.3, 0, mon);
+  noShadow(plane(0.42, 0.26, new THREE.MeshBasicMaterial({ map: scopeTex }), 0, 0.3, 0.017, mon));
+  box(0.36, 0.012, 0.12, M.plastic, 0, 0.006, 0.2, mon);
+  let scopeT = 0;
+  function drawScope(t) {
+    const g = scopeG;
+    g.fillStyle = '#06100c'; g.fillRect(0, 0, 256, 160);
+    g.strokeStyle = 'rgba(80,160,120,.18)'; g.lineWidth = 1;
+    for (let i = 0; i < 9; i++) { g.beginPath(); g.moveTo(i * 32, 0); g.lineTo(i * 32, 160); g.moveTo(0, i * 20); g.lineTo(256, i * 20); g.stroke(); }
+    g.strokeStyle = '#9dffc8'; g.lineWidth = 2; g.beginPath();
+    for (let x = 0; x <= 256; x += 4) { const y = 84 + Math.sin(x * 0.06 + t * 4) * 26 * Math.sin(x * 0.012 + t) + Math.sin(x * 0.3 + t * 9) * 4; g[x ? 'lineTo' : 'moveTo'](x, y); }
+    g.stroke();
+    g.fillStyle = '#9dffc8'; g.font = '700 12px monospace'; g.fillText('SCIENCE LEVEL: ' + (60 + Math.round(Math.sin(t * 0.7) * 30 + 30)) + '%', 10, 18);
+    if (Math.floor(t * 2) % 2) g.fillText('REC', 220, 18);
+    scopeTex.needsUpdate = true;
+  }
+  // a spare robot on charge in the corner, so you can see what you look like
+  const spare = makeRobot(0x9dffc8);
+  spare.position.set(-4.35, 0, 3.2); spare.rotation.y = 2.3;
+  scene.add(spare);
+  box(0.5, 0.03, 0.5, M.darkSteel, -4.35, 0.015, 3.2);
+  tube([[-4.35, 0.03, 3.45], [-4.6, 0.02, 3.7], [-4.9, 0.3, 3.8]], 0.012, M.rubber);
+  // liquid nitrogen dewar
+  const dewarAt = V(-4.2, 0, -1.1);
+  const dw = group(dewarAt.x, 0, dewarAt.z);
+  box(0.5, 0.04, 0.5, M.darkSteel, 0, 0.33, 0, dw);
+  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([a, b]) => box(0.04, 0.33, 0.04, M.darkSteel, a * 0.2, 0.165, b * 0.2, dw));
+  cyl(0.22, 0.2, 0.58, M.steel, 0, 0.64, 0, dw, 32, true).material = std({ color: 0xc9ced3, metalness: 1, roughness: 0.22, side: THREE.DoubleSide });
+  add(new THREE.TorusGeometry(0.22, 0.014, 10, 32), M.steel, 0, 0.93, 0, dw).rotation.x = Math.PI / 2;
+  noShadow(cyl(0.2, 0.2, 0.01, std({ color: 0xeaf6ff, roughness: 0.2, emissive: 0xbfe4ff, emissiveIntensity: 0.25 }), 0, 0.86, 0, dw));
+  plane(0.3, 0.1, std({ map: T.signTex(['LIQUID NITROGEN', '-196 °C. NOT A DRINK.'], '#e8eef2', '#16233a', 512, 170, false), roughness: 0.5 }), 0, 0.6, 0.218, dw);
   plane(0.62, 0.31, std({ map: T.signTex(['SAFETY', 'THIRD'], '#ffc21a', '#111111'), roughness: 0.5 }), 4.6, 1.8, -2.997);
   noShadow(box(0.9, 0.2, 0.05, std({ color: 0x08130c, emissive: 0xffffff, emissiveMap: T.signTex(['DELIVERIES'], '#03140a', '#43ff8a', 512, 128, false), emissiveIntensity: 1.6 }), 3.7, 2.33, -2.975));
   const poster = plane(1.7, 1.06, std({ map: T.posterTex(), roughness: 0.6 }), -4.995, 1.85, -0.7);
   poster.rotation.y = Math.PI / 2;
   // storage cabinet, right wall
   const cab = group(4.7, 0, -0.6);
-  box(0.55, 2.0, 1.3, M.yellow, 0, 1.0, 0, cab);
+  box(0.55, 2.0, 1.3, std({ color: 0x8c949a, metalness: 0.7, roughness: 0.42 }), 0, 1.0, 0, cab);
   box(0.012, 1.9, 0.012, M.dark, -0.28, 1.0, 0, cab);
   box(0.02, 0.2, 0.02, M.steel, -0.29, 1.05, 0.06, cab); box(0.02, 0.2, 0.02, M.steel, -0.29, 1.05, -0.06, cab);
   const flam = plane(0.5, 0.25, std({ map: T.signTex(['FLAMMABLE', '(SO IS EVERYTHING ELSE)'], '#c8201c', '#ffffff'), roughness: 0.5 }), -0.281, 1.55, 0.33, cab);
@@ -270,6 +346,7 @@ export function buildLab(canvas) {
   cyl(0.17, 0.17, 0.05, M.plastic, 0, 0.64, 0, stool);
   for (let i = 0; i < 4; i++) { const a = i * 1.57 + 0.78; const leg = cyl(0.012, 0.012, 0.66, M.steel, Math.cos(a) * 0.15, 0.32, Math.sin(a) * 0.15, stool); leg.rotation.z = -Math.cos(a) * 0.14; leg.rotation.x = Math.sin(a) * 0.14; }
   add(new THREE.TorusGeometry(0.16, 0.008, 8, 28), M.steel, 0, 0.25, 0, stool).rotation.x = Math.PI / 2;
+  prop(stool, { r: 0.2, kind: 'metal', name: 'stool' });
 
   // ---------- balloons ----------
   const balloonGeo = (() => {
@@ -292,7 +369,7 @@ export function buildLab(canvas) {
     }
     return g;
   }
-  const partyCols = [0xff3b5c, 0x2f9bff, 0xffc21a, 0x39d98a, 0x9b5cff];
+  const partyCols = [0xe8e8e6, 0x8c949a, 0x2a2e33, 0xffc21a, 0xbfc6cb];
   const party = partyCols.map((c, i) => {
     const b = makeBalloon(c, 0);
     const a = i * 1.26;
@@ -300,7 +377,9 @@ export function buildLab(canvas) {
     b.rotation.set(Math.sin(a) * 0.3, 0, -Math.cos(a) * 0.3);
     scene.add(b);
     const geo = new THREE.BufferGeometry().setFromPoints([b.position.clone(), V(-4.6, BENCH + 0.05, -2.42)]);
-    scene.add(new THREE.Line(geo, stringMat));
+    const str = new THREE.Line(geo, stringMat);
+    scene.add(str);
+    prop(b, { r: 0.2, kind: 'balloon', buoy: 11.6, pinned: true, name: 'balloon', onGrab: () => { str.visible = false; } });
     return b;
   });
 
@@ -312,6 +391,7 @@ export function buildLab(canvas) {
   const OFF = { balloon: [1.4, 3.55], burner: [0, 0], zap: [3.8, 4.15], water: [0, 0], mic: [3.2, 4.95], mix: [0, 0] };
   const stationPos = {};
   Object.keys(STATION_X).forEach((id) => { stationPos[id] = { x: STATION_X[id] + OFF[id][0], z: -2.55 + OFF[id][1] }; });
+  stationPos.cryo = { x: dewarAt.x, z: dewarAt.z };
   const off = (id) => V(OFF[id][0], 0, OFF[id][1]);
   function stationGroup(id, tableW = 1.6, cx = 0) {
     cur = null;
@@ -339,7 +419,7 @@ export function buildLab(canvas) {
   tube([[SX.balloon, BENCH + 0.04, -2.5], [SX.balloon - 0.12, BENCH + 0.012, -2.42], [SX.balloon - 0.28, BENCH + 0.012, -2.43], [SX.balloon - 0.36, BENCH + 0.05, -2.4]], 0.008, M.rubber);
   const bbox = group(SX.balloon + 0.36, BENCH, -2.62);
   bbox.rotation.y = -0.3;
-  box(0.2, 0.07, 0.14, M.red, 0, 0.035, 0, bbox);
+  box(0.2, 0.07, 0.14, M.wood, 0, 0.035, 0, bbox);
   partyCols.forEach((c, i) => { const d = cyl(0.03, 0.03, 0.006, std({ color: c, roughness: 0.4 }), -0.06 + i * 0.03, 0.074 + i * 0.002, rs(0.03), bbox, 16); d.rotation.z = rs(0.2); });
 
   nozzle.add(off('balloon'));
@@ -442,7 +522,8 @@ export function buildLab(canvas) {
   const tail = add(new THREE.ConeGeometry(0.02, 0.04, 12), duckMat, -0.066, 0.035, 0, duck); tail.rotation.z = 0.9;
   [-0.014, 0.014].forEach((dz) => sph(0.005, M.rubber, 0.062, 0.078, dz, duck));
   duck.rotation.y = 2.4;
-  const tank = { x: wx, z: -2.56, WS, WB, water, waterMat, duck, duckHome: duck.position.clone(), duckBob: 1, duckFree: true };
+  const tank = { x: wx, z: -2.56, WS, WB, water, waterMat, duck, duckHome: duck.position.clone(), duckBob: 1, duckFree: false };
+  prop(duck, { r: 0.05, kind: 'rubber', name: 'duck' });
 
   // ---------- station: microphone ----------
   stationGroup('mic', 1.4, 0.15);
@@ -595,7 +676,7 @@ export function buildLab(canvas) {
   const pl = { x: 0.3, z: 0.6, yaw: 0, pitch: -0.1 };
   const WALLS = [ // things you cannot walk through: [x0, x1, z0, z1]
     [-4.8, 2.6, -3.2, -2.15], [-3.4, -1.8, 0.525, 1.425], [1.4, 3.0, 1.125, 2.025], [3.45, 4.85, 1.925, 2.825],
-    [4.42, 5, -1.25, 0.05], [-5, -4.55, -0.2, 0.5], [0.6, 1.2, -1.15, -0.65], [4.35, 4.75, -2.65, -2.25], [2.7, 3.15, -3, -2.25],
+    [4.42, 5, -1.25, 0.05], [-5, -4.55, -0.2, 0.5], [0.6, 1.2, -1.15, -0.65], [-4.5, -3.9, -1.4, -0.8], [-4.7, -4.0, 2.85, 3.55],
   ];
   function setView(name, snap = false) {
     if (name !== 'menu') return;
@@ -633,7 +714,7 @@ export function buildLab(canvas) {
   const dir = V(0, 0, 0), sphr = new THREE.Spherical();
   function updateCamera(dt, t) {
     if (rig.walk) {
-      camera.position.set(pl.x, 1.6, pl.z);
+      camera.position.set(pl.x, 1.45, pl.z);
       if (rig.shake > 0.001) { camera.position.x += rs(rig.shake) * 0.05; camera.position.y += rs(rig.shake) * 0.05; rig.shake *= Math.exp(-dt * 5); }
       camera.rotation.set(pl.pitch, pl.yaw, 0, 'YXZ');
       return;
@@ -651,6 +732,7 @@ export function buildLab(canvas) {
   }
 
   // ---------- per-frame ----------
+  let amb = 0, flick = 6;
   const floaters = []; // balloons the player has released
   const hv = V(0, 0, 0);
   function update(dt, t) {
@@ -682,6 +764,24 @@ export function buildLab(canvas) {
       peanuts.instanceMatrix.needsUpdate = true;
       if (peaTime <= 0) peanuts.visible = false;
     }
+    rotor.rotation.y += dt * 5;
+    const now = new Date(), sec = now.getSeconds() + now.getMilliseconds() / 1000, mins = now.getMinutes() + sec / 60;
+    hands[0].rotation.z = -((now.getHours() % 12) + mins / 60) / 12 * Math.PI * 2;
+    hands[1].rotation.z = -mins / 60 * Math.PI * 2;
+    hands[2].rotation.z = -Math.floor(sec) / 60 * Math.PI * 2;
+    scopeT += dt; if (scopeT > 0.12) { scopeT = 0; drawScope(t); }
+    animateRobot(spare, t, dt);
+    spare.userData.head.rotation.y = Math.atan2(pl.x - spare.position.x, pl.z - spare.position.z) - spare.rotation.y;
+    amb += dt;
+    if (amb > 0.14) {
+      amb = 0;
+      const a = rnd(6.28);
+      P.emit({ pos: V(dewarAt.x + Math.cos(a) * 0.2, 0.93, dewarAt.z + Math.sin(a) * 0.2), vel: V(Math.cos(a) * 0.18, 0.05, Math.sin(a) * 0.18), gravity: 0.5, life: rnd(1.4, 2.2), size: 0.12, size1: 0.4, color: 0xf2f8ff, alpha: 0.3, tex: 'smoke' });
+      if (mixLiquid.visible && Math.random() < 0.5) P.emit({ pos: V(qx + rs(0.05), flaskY + R + 0.02, -2.55 + rs(0.05)), vel: V(0, 0.12, 0), life: 0.9, size: 0.012, size1: 0.02, tex: 'bubble', alpha: 0.9 });
+    }
+    mixLiquid.rotation.y += dt * 0.6;
+    flick -= dt;
+    if (flick < 0) { flickMat.emissiveIntensity = Math.random() < 0.5 ? 0.4 : 2.6; if (flick < -0.35) { flick = rnd(5, 14); flickMat.emissiveIntensity = 2.6; } }
     P.update(dt);
     updateCamera(dt, t);
   }
@@ -704,7 +804,7 @@ export function buildLab(canvas) {
   function setBloom(on) { quality.bloom = on; bloom.enabled = on; }
 
   // tap targets
-  const hits = Object.keys(SX).map((id) => { const q = stationPos[id]; return { id, box: new THREE.Box3(V(q.x - 0.52, BENCH, q.z - 0.45), V(q.x + 0.52, 1.95, q.z + 0.45)) }; });
+  const hits = [];
   hits.push({ id: 'door', box: new THREE.Box3(V(3.2, 0, -3.1), V(4.2, 2.1, -2.85)) });
   const pkgHit = { id: 'pkg', box: new THREE.Box3() };
   hits.push(pkgHit);
@@ -719,6 +819,19 @@ export function buildLab(canvas) {
     }
     return best;
   }
+  // flat tops loose props can rest on: [x0, x1, z0, z1, height, solid-underneath]
+  const surfaces = [
+    [-4.8, 2.6, -3, -2.15, BENCH, 1], [-3.4, -1.8, 0.525, 1.425, BENCH, 0], [1.4, 3.0, 1.125, 2.025, BENCH, 0], [3.45, 4.85, 1.925, 2.825, BENCH, 0],
+    [0.6, 1.2, -1.15, -0.65, BENCH, 0], [4.42, 5, -1.25, 0.05, 2.0, 1], [-4.75, 0.15, -3, -2.7, 1.95, 0], [-4.75, 0.15, -3, -2.7, 2.44, 0],
+    [tank.x - 0.44, tank.x + 0.44, tank.z - 0.19, tank.z + 0.19, tank.WB, 0], [-4.44, -3.96, -1.34, -0.86, 0.87, 1],
+  ];
+  // where each piece of equipment "reaches": bring something here and it reacts
+  const zones = {
+    balloon: { p: nozzle.clone().add(V(0, 0.05, 0)), r: 0.28 }, burner: { p: flamePos.clone().add(V(0, 0.16, 0)), r: 0.26 },
+    zap: { p: zap.clips.clone().add(V(0, 0.08, 0)), r: 0.3 }, water: { p: V(tank.x, tank.WS - 0.1, tank.z), r: 0.32 },
+    mic: { p: mic.head.clone(), r: 0.3 }, mix: { p: mixer.neck.clone().add(V(0, 0.08, 0)), r: 0.28 },
+    cryo: { p: V(dewarAt.x, 1.0, dewarAt.z), r: 0.34 },
+  };
   const sv = V(0, 0, 0);
   function project(v) { // world point -> CSS pixels (or null when behind the camera)
     sv.copy(v).project(camera);
@@ -729,7 +842,7 @@ export function buildLab(canvas) {
   return {
     THREE, renderer, scene, camera, P, M, rig, setView, startWalk, move, look, nearStation, stationPos, home, update, render, resize, setBloom, setLift, pick, project, quality,
     fxLight, flame, flamePos, tongs, nozzle, zap, tank, mic, mixer, door, doorHandle, pack, burstPeanuts,
-    makeSample, makeBalloon, floaters, BENCH, sample: null,
+    makeSample, makeBalloon, floaters, BENCH, sample: null, props, surfaces, zones, pl, dewarAt,
     shake(a) { rig.shake = Math.max(rig.shake, a); },
   };
 }

@@ -3,6 +3,9 @@ import { initAudio, setMuted, sfx } from './audio.js';
 import { updateTweens, wait } from './fx.js';
 import { buildLab } from './lab.js';
 import { createExperiments } from './experiments.js';
+import { createGrab } from './grab.js';
+import { createNet } from './net.js';
+import { makeRobot, animateRobot } from './robot.js';
 
 const $ = (id) => document.getElementById(id);
 const SAVE_KEY = 'elements-lab-save-v1';
@@ -17,7 +20,7 @@ const isCleared = (z) => !!CONTENT[z] && tasksDone(z) === 3;
 
 // ---------- lab ----------
 const canvas = $('gl');
-let L, X;
+let L, X, G, net = null;
 let state = 'menu', current = 0, busy = false, phase = 'idle', session = 0;
 let pendingTap = null;
 
@@ -189,7 +192,7 @@ function resolveTap(kind) {
 }
 $('marker').onclick = () => resolveTap();
 
-const HOWTO = matchMedia('(pointer: coarse)').matches ? 'Left thumb walks. Right thumb looks. Tap things to use them.' : 'W A S D to walk. Drag to look. Click things to use them.';
+const HOWTO = matchMedia('(pointer: coarse)').matches ? 'Left thumb walks. Right thumb looks. Tap an object to pick it up.' : 'W A S D to walk. Drag to look. Click an object to pick it up.';
 const firstTodo = (z) => CONTENT[z].tasks.find((t) => !(save.done[z] && save.done[z][t])) || CONTENT[z].tasks[0];
 
 async function enterLab(z) {
@@ -210,7 +213,7 @@ async function enterLab(z) {
     await X.toHome();
     if (my !== session) return;
     busy = false;
-    ui.caption('Your sample is on the trolley. Walk around the lab and try it on things. Three of them are the discoveries that unlock the next element.');
+    ui.caption('Your sample is on the trolley. Pick it up and carry it to things around the lab. Three of them are the discoveries that unlock the next element. Everything else in here can be picked up too.');
   } else {
     phase = 'play'; busy = false;
     X.placeSample(z);
@@ -222,6 +225,7 @@ async function enterLab(z) {
 
 function leaveLab() {
   if (busy && !pendingTap) return;
+  G.release();
   session++;
   if (pendingTap) { // walked out mid-delivery: put the door and box back
     const p = pendingTap; pendingTap = null;
@@ -242,6 +246,7 @@ async function useStation(id) {
   const z = current, my = session, r = CONTENT[z].r[id];
   busy = true; refreshHud();
   sfx.click();
+  if (net) net.fx(id, z);
   await X.run(id, z);
   if (my !== session) return;
   ui.caption(r.text);
@@ -403,10 +408,12 @@ canvas.addEventListener('pointermove', (e) => {
 });
 function tapAt(e) {
   const r = canvas.getBoundingClientRect();
-  const id = L.pick(((e.clientX - r.left) / r.width) * 2 - 1, -(((e.clientY - r.top) / r.height) * 2 - 1));
-  if (!id) return;
-  if (id === 'door' || id === 'pkg') resolveTap(id);
-  else useStation(id);
+  const nx = ((e.clientX - r.left) / r.width) * 2 - 1, ny = -(((e.clientY - r.top) / r.height) * 2 - 1);
+  const id = L.pick(nx, ny);
+  if (pendingTap && (id === 'door' || id === 'pkg')) { resolveTap(id); return; }
+  if (G.held) { G.release(); return; }
+  const b = G.pick(nx, ny);
+  if (b) G.grab(b);
 }
 const endPointer = (e) => {
   if (joy && e.pointerId === joy.id) {
@@ -420,7 +427,138 @@ const endPointer = (e) => {
 };
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', (e) => { if (joy && e.pointerId === joy.id) { joy = null; $('joy').hidden = true; } if (drag && e.pointerId === drag.id) drag = null; });
-$('btnUse').onclick = () => { if (nearId) useStation(nearId); };
+$('btnUse').onclick = () => { G.release(true); };
+canvas.addEventListener('contextmenu', (e) => { e.preventDefault(); if (state === 'lab') G.release(true); });
+window.addEventListener('keydown', (e) => { if (state !== 'lab') return; if (e.code === 'KeyF') G.release(true); if (e.code === 'KeyE') G.release(); });
+// ---------- what happens to loose objects ----------
+const said = {};
+const quip = (key, text) => { if (said[key]) return; said[key] = 1; ui.caption(text); };
+let lastBump = 0;
+const ownMats = (b) => { if (b.own) return; b.own = true; b.obj.traverse((o) => { if (o.isMesh && o.material && !Array.isArray(o.material)) o.material = o.material.clone(); }); };
+function shatter(b, why) {
+  const c = G.centre(b).clone();
+  b.dead = 8; b.obj.visible = false;
+  if (b.kind === 'balloon') { sfx.pop(); L.P.burst(10, () => ({ pos: c.clone(), vel: new L.THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3), gravity: 5, life: 0.6, size: 0.05, color: 0xdddddd, tex: 'drop' })); return; }
+  sfx.glass();
+  L.P.burst(22, () => ({ pos: c.clone(), vel: new L.THREE.Vector3((Math.random() - 0.5) * 3.5, Math.random() * 2.6, (Math.random() - 0.5) * 3.5), gravity: 8, life: 0.5 + Math.random() * 0.6, size: 0.02 + Math.random() * 0.03, color: 0xeaf6ff, boost: 2, add: true, tex: 'spark' }));
+  L.shake(0.25);
+  quip(why === 'frozen' ? 'frozenbreak' : 'break', why === 'frozen'
+    ? 'Frozen solid, then dropped. It shattered like a dropped chandelier. A replacement is on the way.'
+    : 'That was glass. It is now many smaller glasses. The lab has a breakage budget; a new one will turn up shortly.');
+}
+function generic(b, id) {
+  const c = G.centre(b).clone();
+  if (id === 'burner') {
+    if (b.kind === 'balloon') { shatter(b); quip('popflame', 'Balloon, meet fire. Fire wins. Fire always wins.'); return; }
+    if (b.frozen) { b.frozen = false; quip('thaw', 'Thawed. It is back to being a normal, breakable-the-usual-way object.'); return; }
+    if (b.burnt) return;
+    b.burnt = true; sfx.hiss(0.8, 0.2); X.smoke(c, 5, 0.3, 0x444444, 0.5);
+    if (b.kind === 'glass') quip('burnglass', 'You are heating empty glassware. Bold. Pointless, but bold.');
+    else if (b.kind === 'rubber') { b.obj.scale.set(1.15, 0.6, 1.15); quip('burnduck', 'The duck is melting. It is looking at you the whole time. You did this.'); }
+    else { ownMats(b); b.obj.traverse((o) => { if (o.isMesh && o.material.color) o.material.color.multiplyScalar(0.3); }); quip('burn' + b.kind, b.kind === 'paper' ? 'Scorched. That is now a first edition and a last edition.' : 'It is hot now. Do not touch it. You are going to touch it.'); }
+  } else if (id === 'zap') {
+    if (b.kind === 'metal') { X.sparks(c, 14); sfx.zap(); quip('zapmetal', 'Sparks! Metal conducts. You have completed a circuit with a ' + b.name + '.'); }
+    else quip('zapno', 'Nothing. A ' + b.name + ' is not a wire, however hard you believe.');
+  } else if (id === 'cryo') {
+    if (b.frozen || b.kind === 'balloon') { if (b.kind === 'balloon') quip('cryoballoon', 'The balloon shrivels in the cold. Gas shrinks when it cools. It will puff back up as it warms.'); return; }
+    b.frozen = true; ownMats(b); sfx.hiss(1, 0.3);
+    const ice = new L.THREE.Color(0xdff0ff);
+    b.obj.traverse((o) => { if (o.isMesh && o.material.color) o.material.color.lerp(ice, 0.6); });
+    X.smoke(c, 8, 0.4, 0xf2f8ff, 0.5);
+    quip('freeze', 'Frozen at −196 °C. It is now extremely brittle. Do not throw it. (Throw it.)');
+  } else if (id === 'mic') {
+    if (b.kind === 'rubber') { sfx.squeak(); ui.bubble('SQUEAK', 2); }
+    else quip('micobj', 'The ' + b.name + ' declines to comment.');
+  }
+}
+const hooks = {
+  onGrab(b) {
+    sfx.tap();
+    if (b.kind === 'rubber') sfx.squeak();
+    if (!said.grab) { said.grab = 1; toast(matchMedia('(pointer: coarse)').matches ? 'Tap again to let go. Press Throw to throw it.' : 'Click again to let go. F or right-click throws.', 4200); }
+  },
+  onRelease(b, thrown) { if (thrown) sfx.whoosh(); if (net && !b.noSync) net.obj(b.id, b.obj.position, b.v); },
+  onImpact(b, sp) {
+    if (b.kind === 'balloon') return;
+    if (b.frozen && sp > 2.4) return shatter(b, 'frozen');
+    if (b.fragile && sp > 3.4) return shatter(b);
+    const now = performance.now();
+    if (now - lastBump < 90) return;
+    lastBump = now;
+    if (b.kind === 'rubber') sfx.squeak(); else if (b.kind === 'glass' || b.kind === 'ceramic') sfx.clink(); else sfx.bump(sp * 0.12);
+    if (b.name === 'cannonball' && sp > 4) L.shake(0.4);
+  },
+  onWater(b, sp) {
+    sfx.splash();
+    const c = G.centre(b).clone(); c.y = L.tank.WS;
+    L.P.burst(12, () => ({ pos: c.clone(), vel: new L.THREE.Vector3((Math.random() - 0.5) * 0.8, 0.8 + Math.random() * 1.2, (Math.random() - 0.5) * 0.5), gravity: 6, life: 0.5, size: 0.03, color: 0xdff4ff, tex: 'drop', alpha: 0.9 }));
+    if (b.isSample) return;
+    quip('water' + b.kind, { rubber: 'It floats. Of course it floats. It is a duck.', paper: 'It floats, and it is getting soggy. The library will hear about this.', balloon: 'A balloon on water. Very festive. Very pointless.', metal: 'It sinks. Metal is denser than water, and also than your plan.' }[b.kind] || 'Plop. It sinks to the bottom and judges you from there.');
+  },
+  onZone(b, id) {
+    if (b.isSample) {
+      if (state === 'lab' && phase === 'play' && !busy && $('mixPanel').hidden && $('unlock').hidden) { if (G.held === b) G.release(); useStation(id); }
+      return;
+    }
+    if (state === 'lab') generic(b, id);
+  },
+  onRespawn() { sfx.tap(); },
+};
+
+// ---------- other players ----------
+const others = new Map();
+const myHue = Math.random();
+function syncPeers(list) {
+  const seen = new Set();
+  for (const p of list) {
+    seen.add(p.id);
+    let o = others.get(p.id);
+    if (!o) {
+      const robot = makeRobot(new L.THREE.Color().setHSL(p.hue, 0.85, 0.6).getHex());
+      robot.position.set(p.x, 0, p.z);
+      L.scene.add(robot);
+      o = { robot, beam: G.makeBeam(new L.THREE.Color().setHSL(p.hue, 0.85, 0.7).getHex()), px: p.x, pz: p.z };
+      others.set(p.id, o);
+      toast('Another scientist rolled in.');
+      sfx.ding();
+    }
+    Object.assign(o, p);
+    const b = p.hold >= 0 ? G.bodies[p.hold] : null;
+    if (b && !b.gone && !b.noSync && b !== G.held) { b.remote = 0.5; b.rp.set(p.hx, p.hy, p.hz); b.pinned = false; if (b.onGrab) { b.onGrab(); b.onGrab = null; } }
+  }
+  for (const [id, o] of others) if (!seen.has(id)) { L.scene.remove(o.robot); L.scene.remove(o.beam); others.delete(id); }
+  $('players').hidden = others.size === 0;
+  $('players').textContent = others.size + 1 + ' scientists here';
+}
+const handPos = { v: null };
+function updatePeers(dt, t) {
+  for (const o of others.values()) {
+    const r = o.robot, k = Math.min(1, dt * 10);
+    const moved = Math.hypot(o.x - r.position.x, o.z - r.position.z);
+    r.position.x += (o.x - r.position.x) * k; r.position.z += (o.z - r.position.z) * k;
+    r.rotation.y = o.yaw + Math.PI;
+    r.userData.head.rotation.x = -o.pitch * 0.7;
+    animateRobot(r, t, dt, Math.min(1, moved * 6));
+    const b = o.hold >= 0 ? G.bodies[o.hold] : null;
+    if (b && !b.gone && b.dead <= 0) {
+      handPos.v = handPos.v || new L.THREE.Vector3();
+      r.userData.hands[1].getWorldPosition(handPos.v);
+      G.setBeam(o.beam, handPos.v, G.centre(b).clone(), t);
+    } else o.beam.visible = false;
+  }
+}
+let netT = 0, wasIn = false;
+function sendPresence(dt) {
+  if (!net) return;
+  const inLab = state === 'lab';
+  if (!inLab) { if (wasIn) { net.leave(); wasIn = false; } return; }
+  netT += dt;
+  if (netT < 0.07) return;
+  netT = 0; wasIn = true;
+  const h = G.held && !G.held.noSync ? G.held : null, r2 = (v) => Math.round(v * 100) / 100;
+  net.presence({ in: 1, x: r2(L.pl.x), z: r2(L.pl.z), yaw: r2(L.pl.yaw), pitch: r2(L.pl.pitch), c: r2(myHue), h: h ? h.id : -1, hx: h ? r2(h.obj.position.x) : 0, hy: h ? r2(h.obj.position.y) : 0, hz: h ? r2(h.obj.position.z) : 0 });
+}
+
 function controls(dt) {
   if (state !== 'lab') return;
   let f = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
@@ -429,8 +567,8 @@ function controls(dt) {
   if (keys.ArrowRight) L.look(1.8 * dt, 0);
   if (joy) { f -= joy.dy; s += joy.dx; }
   if (f || s) L.move(dt, Math.max(-1, Math.min(1, f)), Math.max(-1, Math.min(1, s)));
-  const near = phase === 'play' && !busy && $('mixPanel').hidden && $('unlock').hidden ? L.nearStation() : null;
-  if (near !== nearId) { nearId = near; $('btnUse').hidden = !near; }
+  const holding = !!G.held;
+  if (holding !== nearId) { nearId = holding; $('btnUse').hidden = !holding; }
 }
 
 // iPad Safari: stop pinch-zoom and double-tap zoom from hijacking the game
@@ -456,13 +594,21 @@ function placeMarker() {
 
 function boot() {
   L = buildLab(canvas);
+  G = createGrab(L, hooks);
+  L.G = G;
+  L.props.forEach(([obj, o]) => G.add(obj, o));
   X = createExperiments(L, ui);
+  createNet({
+    peers: syncPeers,
+    obj(id, p, v) { const b = G.bodies[id]; if (!b || b.gone || b.noSync || b === G.held || b.dead > 0) return; b.obj.position.set(p[0], p[1], p[2]); b.v.set(v[0], v[1], v[2]); b.rest = false; b.remote = 0; b.pinned = false; },
+    fx(st, z) { if (state === 'lab' && NAMES[z - 1]) toast('Another scientist is trying ' + NAMES[z - 1] + ' on something.'); },
+  }).then((n) => { net = n; });
   buildTable(); buildDock(); refreshSound();
   resize();
   window.addEventListener('resize', resize);
   L.setView('menu', true);
   show('menu');
-  window.__lab = { maxDt: 0.1, speed: 1, L, X, save: () => save, useStation, enterLab, resolveTap, state: () => ({ state, busy, phase, current }) };
+  window.__lab = { maxDt: 0.1, speed: 1, L, X, G, syncPeers, save: () => save, useStation, enterLab, resolveTap, state: () => ({ state, busy, phase, current }) };
 
   let last = performance.now(), t = 0, slow = 0, frames = 0;
   function frame(now) {
@@ -475,6 +621,8 @@ function boot() {
     updateTweens(dt);
     controls(Math.min(raw, 0.1));
     L.update(dt, t);
+    if (state === 'lab') { G.step(Math.min(dt, 0.033), t); updatePeers(dt, t); }
+    sendPresence(dt);
     L.render();
     placeMarker();
     // If the device is struggling, trade sharpness, then glow, for frame rate.

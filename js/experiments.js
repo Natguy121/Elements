@@ -17,18 +17,25 @@ export function createExperiments(L, ui) {
   const samplePos = (id) => V(L.stationPos[id].x + (id === 'water' ? -0.57 : -0.36), L.BENCH, L.stationPos[id].z + (id === 'water' ? 0.25 : 0.2));
   const valve = () => L.sample.localToWorld(L.sample.userData.valve.clone());
 
+  function dropSample() {
+    const old = L.sample;
+    if (!old) return;
+    if (old.userData.chunk && old.userData.chunk.parent !== old) scene.remove(old.userData.chunk);
+    if (old.userData.body) L.G.remove(old.userData.body);
+    scene.remove(old);
+    L.sample = null;
+  }
   function setSample(z) {
-    if (L.sample) {
-      const old = L.sample;
-      if (old.userData.chunk && old.userData.chunk.parent !== old) scene.remove(old.userData.chunk);
-      scene.remove(old);
-    }
+    dropSample();
     L.sample = L.makeSample(z);
     scene.add(L.sample);
+    const body = L.G.add(L.sample, { r: CONTENT[z].form === 'gas' ? 0.13 : 0.08, kind: 'metal', noSync: true, name: 'sample' });
+    body.isSample = true;
     return L.sample;
   }
+  const settle = () => { const b = L.sample && L.sample.userData.body; if (b) { b.kin = false; b.rest = true; b.v.set(0, 0, 0); L.sample.rotation.set(0, 0, 0); } };
   function placeSample(z) { setSample(z).position.copy(L.home); }
-  function toHome() { sfx.whoosh(); return arc(L.sample, L.home, 1.1, 0.6); }
+  async function toHome() { sfx.whoosh(); L.sample.userData.body.kin = true; L.sample.rotation.set(0, 0, 0); await arc(L.sample, L.home, 1.1, 0.6); settle(); }
   async function bring(id) {
     const tgt = samplePos(id);
     if (L.sample.position.distanceTo(tgt) > 0.05) { sfx.tap(); await arc(L.sample, tgt, 0.6, 0.4); }
@@ -83,6 +90,7 @@ export function createExperiments(L, ui) {
   }
   const relight = () => { sfx.click(); L.flame.setColor(null); L.flame.power = 1; return anim(0.35, (e) => L.flame.group.scale.setScalar(Math.max(e, 0.001)), ease.back); };
 
+  const loose = [];
   // ----- balloon -----
   async function balloon(z, el, r) {
     const N = L.nozzle;
@@ -100,32 +108,15 @@ export function createExperiments(L, ui) {
     b.userData.string.visible = true;
     const p0 = b.position.clone();
     const keep = (f) => { L.floaters.push(f); if (L.floaters.length > 12) scene.remove(L.floaters.shift().b); };
-    if (r.fx === 'float') {
-      const tx = N.x + rs(0.7), tz = N.z + 0.2 + rnd(0.45), ty = 3.2 - 0.46;
-      L.rig.tLook.y = 2.1;
-      await anim(r.slow ? 3.6 : 1.8, (e) => b.position.set(lerp(p0.x, tx, e), lerp(p0.y, ty, e), lerp(p0.z, tz, e)), r.slow ? ease.io : ease.in);
-      sfx.tap();
-      keep({ b, mode: 'ceil', y: ty, ph: rnd(6) });
-      await wait(0.9);
-      L.rig.tLook.y = 1.3;
-    } else if (r.fx === 'hover') {
-      const c = V(N.x + 0.5, 1.95, N.z + 0.7);
-      L.rig.tLook.y = 1.7;
-      await anim(2.2, (e) => b.position.lerpVectors(p0, c, e));
-      keep({ b, mode: 'hover', x: c.x, y: c.y, z: c.z, ph: 0 });
-      await wait(0.8);
-      L.rig.tLook.y = 1.3;
-    } else if (r.fx === 'sink') {
-      const tgt = V(N.x + rs(0.5), 0, N.z + 1.0 + rs(0.2));
-      sfx.trombone();
-      L.rig.tLook.y = 0.9;
-      await arc(b, tgt, 2.2, 0.25, ease.lin);
-      await anim(0.5, (e, k) => { b.position.y = Math.sin(Math.PI * k) * 0.1; }, ease.lin);
-      b.userData.string.visible = false;
-      await to(b.rotation, { z: 1.25 }, 0.5, ease.out);
-      keep({ b, mode: 'floor' });
-      await wait(0.5);
-      L.rig.tLook.y = 1.3;
+    if (r.fx === 'float' || r.fx === 'hover' || r.fx === 'sink') {
+      // hand the balloon over to physics: it is now a loose object you can grab
+      const buoy = r.fx === 'float' ? (r.slow ? 10.5 : 12.3) : r.fx === 'hover' ? 9.8 : 8.6;
+      const body = L.G.add(b, { r: 0.2, kind: 'balloon', buoy, noSync: true, name: 'balloon' });
+      body.rest = false; body.v.set(rs(0.4), r.fx === 'sink' ? 0.7 : 0.3, 0.6);
+      if (r.fx === 'sink') sfx.trombone();
+      loose.push(body);
+      if (loose.length > 10) { const o = loose.shift(); scene.remove(o.obj); L.G.remove(o); }
+      await wait(2.4);
     } else if (r.fx === 'eaten') {
       const m = b.userData.skin.material, c0 = m.color.clone(), c1 = new THREE.Color(0x3a2a12);
       sfx.hiss(1.6, 0.3);
@@ -324,19 +315,10 @@ export function createExperiments(L, ui) {
       const setLevel = (s) => { Tk.water.scale.y = s; Tk.water.position.y = Tk.WB + (Tk.WS - Tk.WB) * s / 2; };
       setLevel(0.55);
       anim(3.5, (e) => setLevel(0.55 + 0.45 * e), ease.io);
-      // the duck achieves orbit
-      const d = Tk.duck;
-      Tk.duckFree = false; sfx.squeak();
-      L.rig.tLook.y = 2.0;
-      const y0 = d.position.y;
-      await anim(0.5, (e) => { d.position.y = lerp(y0, 3.08, e); d.rotation.z += 0.6; }, ease.out);
-      d.rotation.set(0, 2.4, Math.PI); sfx.thud();
-      await wait(1.5);
-      sfx.squeak();
-      L.rig.tLook.y = 1.3;
-      await anim(0.55, (e) => { d.position.y = lerp(3.08, Tk.WS, e); d.rotation.z = Math.PI * (1 - e) * 3; }, ease.in);
-      d.rotation.set(0, 2.4, 0); sfx.splash(); splash(d.position, 14, 1.1);
-      Tk.duckFree = true; Tk.duckBob = 1;
+      // anything floating in the tank achieves orbit
+      L.G.kickTank(8.5); sfx.squeak();
+      await wait(2.4);
+      Tk.duckBob = 1;
       await returnChunk(true);
     } else { // sink, with optional lazy bubbles or a ghostly glow
       await anim(1.2, (e, k) => { chunk.position.lerpVectors(surf, bottom, e); if (Math.random() < 0.25 * (1 - k)) bubblesAt(chunk.position, 1, 0.02); }, ease.out);
@@ -388,12 +370,28 @@ export function createExperiments(L, ui) {
     await wait(0.3);
   }
 
-  const RUN = { balloon, burner, zap: zapIt, water: waterIt, mic: micIt };
+  // ----- liquid nitrogen -----
+  async function cryoIt(z, el, r) {
+    const s = L.sample, top = L.zones.cryo.p.clone();
+    await arc(s, top.clone().add(V(0, 0.2, 0)), 0.6, 0.3);
+    sfx.hiss(1.8, 0.3);
+    await to(s.position, { y: 0.62 }, 0.5, ease.in);
+    P.burst(22, () => ({ pos: top.clone().add(V(rs(0.15), -0.05, rs(0.15))), vel: V(rs(0.5), rnd(0.2, 0.9), rs(0.5)), gravity: 0.8, life: rnd(1.2, 2.2), size: 0.15, size1: 0.7, color: 0xf2f8ff, alpha: 0.5, tex: 'smoke' }));
+    await wait(1.3);
+    await to(s.position, { y: top.y + 0.2 }, 0.5, ease.out);
+    sparks(top.clone().add(V(0, 0.3, 0)), 12, 0xdff4ff); sfx.sparkle();
+    await wait(0.7);
+  }
+
+  const RUN = { balloon, burner, zap: zapIt, water: waterIt, mic: micIt, cryo: cryoIt };
   async function run(id, z) {
     const el = CONTENT[z];
-    L.setView(id);
-    await bring(id);
+    const body = L.sample.userData.body;
+    body.kin = true; L.sample.rotation.set(0, 0, 0);
+    if (id !== 'cryo') await bring(id);
     await RUN[id](z, el, el.r[id]);
+    if (id === 'cryo') await toHome();
+    settle();
   }
 
   // ----- mixer -----
@@ -462,7 +460,7 @@ export function createExperiments(L, ui) {
   // waitTap(kind) resolves when the player taps the door / the box.
   async function deliver(z, waitTap) {
     const el = CONTENT[z], pk = L.pack, g = pk.group;
-    if (L.sample) { scene.remove(L.sample); L.sample = null; }
+    dropSample();
     L.setView('door');
     ui.caption('Knock knock. Something is at the door. It is probably science.');
     sfx.knock();
@@ -499,6 +497,7 @@ export function createExperiments(L, ui) {
     L.burstPeanuts(g.position.clone().add(V(0, 0.3, 0)));
     sfx.whoosh();
     const s = setSample(z);
+    s.userData.body.kin = true;
     s.position.copy(g.position).y = 0.05;
     s.scale.setScalar(0.6);
     P.burst(12, () => ({ pos: g.position.clone().add(V(rs(0.15), 0.35, rs(0.12))), vel: V(rs(0.3), rnd(0.5, 1.4), rs(0.3)), life: rnd(0.8, 1.4), size: 0.06, size1: 0.02, color: 0xffe9a0, boost: 3, add: true, tex: 'spark' }));
@@ -514,5 +513,5 @@ export function createExperiments(L, ui) {
     });
   }
 
-  return { run, mix, deliver, placeSample, samplePos, bring, toHome };
+  return { run, mix, deliver, placeSample, samplePos, bring, toHome, sparks, smoke };
 }

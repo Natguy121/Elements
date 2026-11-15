@@ -121,5 +121,8 @@ export const sfx = {
   stink() { tone({ type: 'sawtooth', f: 95, f2: 60, dur: 0.5, vol: 0.2, attack: 0.03 }); tone({ type: 'square', f: 70, f2: 48, dur: 0.35, vol: 0.1, delay: 0.12 }); },
   alarm() { for (let i = 0; i < 4; i++) tone({ type: 'square', f: 880, dur: 0.14, vol: 0.09, delay: i * 0.3 }); },
   squeak() { tone({ type: 'sine', f: 1500, f2: 2300, dur: 0.09, vol: 0.2 }); tone({ type: 'sine', f: 2300, f2: 1400, dur: 0.12, vol: 0.2, delay: 0.1 }); },
+  glass() { noise({ dur: 0.35, vol: 0.5, type: 'highpass', f: 5200 }); [3100, 4200, 5300, 6700].forEach((f, i) => tone({ f, f2: f * 0.96, dur: 0.18 + i * 0.05, vol: 0.09, delay: i * 0.025 })); },
+  clink() { tone({ f: 2600, dur: 0.07, vol: 0.12 }); tone({ f: 3900, dur: 0.05, vol: 0.06, delay: 0.01 }); },
+  bump(v = 0.4) { tone({ f: 120, f2: 50, dur: 0.14, vol: Math.min(0.7, v) }); noise({ dur: 0.06, vol: Math.min(0.3, v * 0.5), f: 600 }); },
   sparkle() { [1568, 2093, 2637].forEach((f, i) => tone({ f, dur: 0.25, vol: 0.1, delay: i * 0.06 })); },
 };

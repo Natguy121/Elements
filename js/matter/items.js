@@ -63,6 +63,12 @@ export function createMatter(G) {
     return (geoCache[type] = { outer, inner, rim });
   }
   const DARK = new THREE.Color(0x0b0f12);
+  // spills spread into irregular blobs, not perfect circles
+  function blobGeo() {
+    const sh = new THREE.Shape(), n = 26, ph = [Math.random() * 6, Math.random() * 6, Math.random() * 6];
+    for (let i = 0; i <= n; i++) { const a = i / n * Math.PI * 2, r = 1 + 0.16 * Math.sin(a * 2 + ph[0]) + 0.1 * Math.sin(a * 3 + ph[1]) + 0.06 * Math.sin(a * 5 + ph[2]); if (i) sh.lineTo(Math.cos(a) * r, Math.sin(a) * r); else sh.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
+    const g = new THREE.ShapeGeometry(sh, 2); g.rotateX(-Math.PI / 2); return g;
+  }
   const discGeo = new THREE.CircleGeometry(1, 28); discGeo.rotateX(-Math.PI / 2);
   const coneGeo = new THREE.ConeGeometry(1, 1, 22); coneGeo.translate(0, 0.5, 0);
   const pieceGeo = new THREE.IcosahedronGeometry(1, 1);
@@ -385,7 +391,7 @@ export function createMatter(G) {
       q.r += (target - q.r) * Math.min(1, dt * 6);
       if (q.vol < 0.002 && q.r < 0.008) { scene.remove(q.m); heaps.splice(i, 1); continue; }
       const breathe = 1 + Math.sin(t * 2.3 + i) * 0.012;
-      q.m.position.set(q.x, q.y + 0.001, q.z); q.m.scale.set(q.r * breathe, q.r * 0.62, q.r * breathe);
+      q.m.position.set(q.x, q.y + 0.001, q.z); q.m.scale.set(q.r * breathe, q.r * 0.85, q.r * breathe);
     }
   }
   // overflow from one container: the column rises out of the mouth; past its height it topples into a mound
@@ -435,7 +441,7 @@ export function createMatter(G) {
     for (const q of puddles) if (Math.abs(q.y - y) < 0.03 && Math.hypot(q.x - x, q.z - z) < q.r + 0.05) { pd = q; break; }
     if (!pd) {
       if (puddles.length >= 36) { const old = puddles.shift(); disposePuddle(old); }
-      const disc = new THREE.Mesh(discGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, transparent: true, opacity: 0.5, depthWrite: false, envMapIntensity: 1.8, polygonOffset: true, polygonOffsetFactor: -2 }));
+      const disc = new THREE.Mesh(blobGeo(), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, transparent: true, opacity: 0.5, depthWrite: false, envMapIntensity: 1.8, polygonOffset: true, polygonOffsetFactor: -2 }));
       const pile = new THREE.Mesh(coneGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 })); pile.castShadow = true;
       disc.renderOrder = 1; disc.receiveShadow = true;
       scene.add(disc, pile);
@@ -459,7 +465,7 @@ export function createMatter(G) {
       const rl = Math.min(0.7, Math.sqrt(a.liquid * 0.001 / (Math.PI * thick)));
       pd.disc.visible = !!top && rl > 0.004;
       // clear liquids read as a dark wet sheen on the bench, coloured or cloudy ones show their colour
-      if (top) { const clear = !top.metal && top.alpha < 0.5 && !(top.cloud > 0.2); pd.disc.material.color.set(top.color); if (clear) pd.disc.material.color.lerp(DARK, 0.72); pd.disc.material.opacity = clear ? 0.42 : Math.min(0.95, top.alpha + 0.2); pd.disc.material.metalness = top.metal ? 1 : 0; pd.disc.material.roughness = top.metal ? 0.12 : 0.03; pd.disc.scale.setScalar(Math.max(rl, 0.001)); pd.disc.position.set(pd.x, pd.y + 0.0016, pd.z); }
+      if (top) { const clear = !top.metal && top.alpha < 0.5 && !(top.cloud > 0.2); pd.disc.material.color.set(top.color); if (clear) pd.disc.material.color.lerp(DARK, 0.72); else if (!top.metal) pd.disc.material.color.lerp(DARK, 0.35); pd.disc.material.opacity = clear ? 0.42 : Math.min(0.72, top.alpha * 0.75); pd.disc.material.metalness = top.metal ? 1 : 0; pd.disc.material.roughness = top.metal ? 0.12 : 0.03; pd.disc.scale.setScalar(Math.max(rl, 0.001)); pd.disc.position.set(pd.x, pd.y + 0.0016, pd.z); }
       const rp = sed ? Math.cbrt(3 * sed.vol * 0.001 / (Math.PI * 0.62)) : 0;
       pd.pile.visible = rp > 0.003;
       if (sed) { pd.pile.material.color.set(sed.color); pd.pile.scale.set(rp, rp * 0.62, rp); pd.pile.position.set(pd.x, pd.y, pd.z); }

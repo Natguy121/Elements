@@ -405,6 +405,8 @@ function boot() {
     if (!save.seenIntro) { save.seenIntro = true; persist(); hud.toast('Welcome', 'Start at the right-hand bench: pour vinegar onto baking soda and see what happens.'); hud.toast('Tip', 'Hold the left mouse button to carry things. Right button pours.'); }
   };
   window.addEventListener('pointerdown', () => initAudio(), { passive: true });
+  // Browsers never let a page block Ctrl+W, but they do let it ask before the tab closes mid-experiment
+  window.addEventListener('beforeunload', (e) => { if (state === 'play') { e.preventDefault(); e.returnValue = ''; } });
 
   // ---------- settings and resize ----------
   let pr = 1, scale = 1;

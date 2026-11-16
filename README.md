@@ -24,7 +24,7 @@ npm run build                    # writes dist/reaction-lab.html
 
 | | Keyboard and mouse | Touch (tablet, phone) |
 | --- | --- | --- |
-| Move | W A S D, Shift sprint, Space jump, Ctrl crouch, Q / E lean | Left thumb anywhere in the lower left |
+| Move | W A S D, Shift sprint, Space jump, C crouch, Q / E lean | Left thumb anywhere in the lower left |
 | Look | Mouse (click the view to capture it) | Drag anywhere else |
 | Grab | Hold left mouse on an object | Tap it |
 | Drop / throw | Let go (swing while letting go to throw) | Tap again, or the Drop button |

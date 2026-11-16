@@ -49,7 +49,7 @@ export function createPlayer(phys, camera, settings) {
     if (p.onGround && !wasGround && p.air > 0.25) { play('land', null, Math.min(1, p.air * 1.5)); p.trauma = Math.max(p.trauma, Math.min(0.25, p.air * 0.2)); }
     p.air = p.onGround ? 0 : p.air + dt;
 
-    p.crouch = !p.dead && (k.has('ControlLeft') || k.has('KeyC'));
+    p.crouch = !p.dead && k.has('KeyC'); // not Ctrl: Ctrl+W closes the browser tab
     const moving = len > 0.1;
     const sprint = !p.crouch && moving && f > 0 && k.has('ShiftLeft') && p.stamina > 0.05;
     const load = 1 / (1 + p.carryMass / 22);

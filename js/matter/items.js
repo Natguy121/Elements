@@ -74,6 +74,7 @@ export function createMatter(G) {
     if (sp < 0.5) return;
     const now = G.time;
     if (it.breakV && sp > it.breakV && !it.dead && !it.breaking) {
+      it.lastImpact = sp; it.lastHitBy = e.body.item ? e.body.item.name + (e.body.item.held ? ' (held)' : '') : 'the room';
       const soft = e.body.item && e.body.item.kind === 'lump' && e.body.mass < 0.05; // a pea of sodium does not smash a beaker
       if (!soft) { it.breaking = true; breakQueue.push(it); return; }
     }
@@ -214,6 +215,8 @@ export function createMatter(G) {
   const shards = [];
   function shatter(it) {
     if (it.dead) return;
+    G.stats.broken++; G.stats.lastBroken = it.name + ' (hit at ' + (it.lastImpact || 0).toFixed(1) + ' m/s by ' + (it.lastHitBy || 'something') + ')';
+    (G.stats.brokenList ||= []).push(G.stats.lastBroken);
     const p = it.body.position, v = it.body.velocity;
     play('shatter', p, 1.2);
     G.hooks.discover('obs_broken');
@@ -283,6 +286,7 @@ export function createMatter(G) {
           const hb = cv2.y + it.halfH, rad = Math.hypot(cv2.x, cv2.z), d = it.def;
           if (hb > d.H - 0.045 && hb < d.H + 0.03 && rad < d.rimR + 0.004) {
             if (!p.foam) { it.mix.merge(p.mix); it.dirty = true; it.changed = G.time; if (Math.random() < 0.3) play(p.r > 0.008 ? 'splash' : 'drip', b, 0.25); }
+            if (G.landings) G.landings.push([p.x, p.z, 'in']);
             done = true; break;
           }
         }
@@ -293,10 +297,11 @@ export function createMatter(G) {
           const hp = hit.hitPointWorld, ny = hit.hitNormalWorld.y, tgt = hit.body.item;
           if (tgt && tgt.kind === 'vessel' && ny > 0.6 && Math.hypot(hp.x - (tgt.base.x + tgt.up.x * tgt.def.H), hp.z - (tgt.base.z + tgt.up.z * tgt.def.H)) < tgt.def.rimR + 0.004) {
             if (!p.foam) { tgt.mix.merge(p.mix); tgt.dirty = true; tgt.changed = G.time; }
+            if (G.landings) G.landings.push([hp.x, hp.z, 'in']);
             done = true;
           } else if (ny > 0.45) {
             if (inDrain(hp.x, hp.y, hp.z)) done = true;
-            else if (!tgt) { if (!p.foam) spill(p.mix, hp.x, hp.y, hp.z); else foamBlob(hp); done = true; }
+            else if (!tgt) { if (G.landings) G.landings.push([hp.x, hp.z, 'bench']); if (!p.foam) spill(p.mix, hp.x, hp.y, hp.z); else foamBlob(hp); done = true; }
             else if (tgt.kind === 'lump' && [...p.mix.ids()].some((id) => canReact(tgt.sub, id))) { landOnGround(p); done = true; }
             else { p.x = hp.x + hit.hitNormalWorld.x * 0.02; p.z = hp.z + hit.hitNormalWorld.z * 0.02; p.y = hp.y + 0.004; p.vx += (Math.random() - 0.5) * 0.6; p.vz += (Math.random() - 0.5) * 0.6; p.vy = 0.2; p.life = Math.min(p.life, 0.6); }
           } else { p.x = hp.x + hit.hitNormalWorld.x * 0.006; p.y = hp.y; p.z = hp.z + hit.hitNormalWorld.z * 0.006; p.vx *= 0.1; p.vz *= 0.1; }
@@ -434,6 +439,8 @@ export function createMatter(G) {
     it.flowing = 0;
     const awake = it.held || it.body.sleepState !== 2;
     if (!awake && total <= d.cap) return;
+    // supply bottles and jars have lids: they only pour while someone is holding them
+    if (it.supply && !it.held && total <= d.cap) return;
     const tilt = Math.acos(Math.max(-1, Math.min(1, up.y)));
     if (total <= 1e-6 || (tilt < 0.06 && total <= d.cap)) { dumpChunks(it, tilt, dt); return; }
     const over = Math.max(0, total - d.cap);
@@ -445,19 +452,27 @@ export function createMatter(G) {
     if (head > 0.0003) {
       const w = Math.min(d.spout, d.rimR * 1.2);
       const visc = a.top && a.top.key === 'org' ? 7 : 1;
-      let q = 0.6 * w * Math.sqrt(2 * G9) * Math.pow(head, 1.5) * 1000 / visc; // litres per second
+      let q = 0.6 * w * Math.sqrt(2 * G9) * Math.pow(head, 1.5) * 1000 / visc; // over the lip (weir), litres per second
+      // a narrow neck chokes the flow, and air has to get in the same way, so bottles glug
+      const orifice = 0.5 * 0.6 * Math.PI * d.rimR * d.rimR * Math.sqrt(2 * G9 * head) * 1000 / Math.sqrt(visc);
+      q = Math.min(q, orifice);
       if (dry) q *= 0.5;
       q = Math.min(q, total / 0.2, 0.25);
       it.pourAcc += q * dt; it.pourT += dt; it.flowing = q;
       if (it.pourAcc >= 0.0007 || it.pourT > 0.05) {
         const hx = up.x, hz = up.z, hl = Math.hypot(hx, hz) || 1;
         const nx = hl > 0.02 ? hx / hl : Math.cos(it.id), nz = hl > 0.02 ? hz / hl : Math.sin(it.id);
-        t2.set(base.x + up.x * d.H + nx * (d.rimR + 0.003), yw(d.H) - d.rimR * sinT + 0.002, base.z + up.z * d.H + nz * (d.rimR + 0.003));
-        const vo = Math.sqrt(2 * G9 * head) * 0.7 + 0.12, bv = it.body.velocity;
-        t3.set(nx * vo + bv.x, bv.y - 0.05, nz * vo + bv.z);
+        // the lowest point of the rim: from the mouth centre, toward 'down' as seen across the mouth
+        const gx = up.x * up.y, gy = -1 + up.y * up.y, gz = up.z * up.y, gl = Math.hypot(gx, gy, gz) || 1;
+        t2.set(base.x + up.x * d.H + gx / gl * (d.rimR + 0.002), base.y + up.y * d.H + gy / gl * (d.rimR + 0.002), base.z + up.z * d.H + gz / gl * (d.rimR + 0.002));
+        const vo = Math.min(Math.sqrt(2 * G9 * head) * 0.55, 0.15 + q * 6), bv = t1.set(it.body.velocity.x, it.body.velocity.y, it.body.velocity.z).clampLength(0, 4);
+        it.exitV = vo;
+        // leaves the lip along the container's axis (sideways when level, downward when tipped further)
+        const ax = up.x, ay = Math.min(0, up.y), az = up.z, al = Math.hypot(ax, ay, az) || 1;
+        t3.set(ax / al * vo + bv.x, ay / al * vo + bv.y - 0.05, az / al * vo + bv.z);
         let vol = it.pourAcc; it.pourAcc = 0; it.pourT = 0;
         if (it.foam > 0.0005 && (over > 0 || a.total < 1e-5)) { const f = Math.min(it.foam, vol); it.foam -= f; emitParcel(mix.takeVolume(f * 0.08), t2, t3, { color: '#ffffff', foam: a.total < 1e-5, src: it }); vol -= f; }
-        if (vol > 1e-6 && a.total > 1e-6) { emitParcel(mix.takeVolume(vol), t2, t3, { src: it }); }
+        if (vol > 1e-6 && a.total > 1e-6) { emitParcel(mix.takeVolume(vol), t2, t3, { src: it }); if (G.emitLog && G.emitLog.length < 40) G.emitLog.push({ p: t2.toArray().map((v) => +v.toFixed(3)), v: t3.toArray().map((v) => +v.toFixed(2)), up: up.toArray().map((v) => +v.toFixed(2)), q: +q.toFixed(3), head: +head.toFixed(3) }); }
         it.dirty = true; it.changed = G.time;
       }
     }

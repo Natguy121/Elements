@@ -125,3 +125,23 @@ test('pouring conserves mass and leaves lumps behind', () => {
   assert.ok(Math.abs(p.massG() + m.massG() - m0) < 1e-9);
   assert.equal(p.get('gold'), 0);
 });
+
+test('strong acid pH, titration through neutral, and indicator colours', async () => {
+  const { indicatorColor } = await import('../js/chem/mixture.js');
+  const m = new Mixture(20); m.add('water', 5.55); m.add('hcl', 0.01); // 0.1 M HCl in 100 mL
+  assert.ok(Math.abs(m.pH() - 1) < 0.1, 'pH ' + m.pH());
+  m.add('naoh', 0.02);
+  for (let i = 0; i < 200; i++) stepMixture(m, 0.05, {});
+  assert.ok(m.pH() > 12.5, 'excess NaOH makes it alkaline ' + m.pH());
+  assert.ok(Math.abs(m.get('nacl') - 0.01) < 1e-4);
+  assert.equal(indicatorColor('phph', 5)[1], 0, 'phenolphthalein is colourless in acid');
+  assert.ok(indicatorColor('phph', 11)[1] > 0.9, 'and pink in alkali');
+});
+
+test('copper sulfate crystallises when a hot saturated solution cools', () => {
+  const m = new Mixture(80); m.add('water', 5.55); m.add('cuso4', 0.3); // 75 g in 100 g water
+  assert.ok(m.dissolvedMol('cuso4') > 0.299, 'all dissolves hot');
+  m.T = 20;
+  const left = (m.n.cuso4 - m.dissolvedMol('cuso4')) * SUB.cuso4.M;
+  assert.ok(Math.abs(left - 43) < 2, 'about 43 g comes out at 20 C, got ' + left.toFixed(1));
+});

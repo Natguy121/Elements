@@ -34,7 +34,7 @@ const persistNow = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(s
 
 const G = {
   THREE, Mixture, save, settings: save.settings, persist, time: 0, sources: [], levels: { burner: 0 }, dist: distGain,
-  have: new Set(ELEMENTS.filter((e) => e.start).map((e) => e.sym)), hooks: {}, stats: { biggest: 0, broken: 0 },
+  timeScale: 1, have: new Set(ELEMENTS.filter((e) => e.start).map((e) => e.sym)), hooks: {}, stats: { biggest: 0, broken: 0 },
 };
 
 function boot() {
@@ -391,6 +391,12 @@ function boot() {
   function openBook(tab) { uiOpen = true; input.st.enabled = false; input.unlock(); hud.openBook(tab); }
   function uiKeys() {
     if (state !== 'play') return;
+    if (input.hit('KeyZ') && !hud.bookOpen && !hud.pauseOpen) {
+      // fast-forward chemistry and heat (not your legs): for slow reactions, cooling and crystal growing
+      G.timeScale = G.timeScale === 1 ? 4 : G.timeScale === 4 ? 16 : 1;
+      $('timeChip').hidden = G.timeScale === 1; $('timeChip').textContent = 'Time ×' + G.timeScale + '  (Z)';
+      play('click');
+    }
     const esc = input.hit('Escape');
     if (hud.bookOpen) { if (esc || input.hit('Tab')) hud.closeBook(); else if (input.hit('KeyP')) hud.openBook('table'); else if (input.hit('KeyN') && document.activeElement !== $('notes')) hud.openBook('notes'); return; }
     if (hud.pauseOpen) { if (esc) { hud.closePause(); G.hooks.resume(); } return; }

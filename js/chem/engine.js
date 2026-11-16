@@ -114,6 +114,8 @@ export function observe(mix) {
       if (s.sol >= 5 && (mix.n[id] - d) * s.M > 1) out.push('obs_saturated');
     }
     if (mix.n.indicator && a.pH !== null) out.push(a.pH < 5 ? 'obs_acid' : a.pH > 9 ? 'obs_base' : a.pH > 6 && a.pH < 8 ? 'obs_neutral' : null);
+    if (mix.n.phph && a.pH !== null && a.pH > 8.6) out.push('obs_phph');
+    if (mix.n.cabbage && a.pH !== null && (a.pH < 3 || a.pH > 11)) out.push('obs_cabbage');
     const st = mix.grams('starch');
     if (st > 10 && st / waterG > 1.1 && st / waterG < 2.8) out.push('obs_oobleck');
   }

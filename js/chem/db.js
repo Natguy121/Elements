@@ -30,6 +30,18 @@ for (const s of Object.values(SUB)) {
   if (s.supply) continue;
   DISC['sub_' + s.id] = { id: 'sub_' + s.id, name: s.name, formula: s.formula, cat: s.cat || 'Compounds', fact: s.fact, hint: 'A product of some reaction you have not tried yet.', sub: s.id };
 }
+// The balanced equation for a reaction, written the way a textbook would ("2 Na + 2 H₂O → 2 NaOH + H₂")
+const SUBS = '₀₁₂₃₄₅₆₇₈₉';
+export const pretty = (f) => (f || '').replace(/\d/g, (d) => SUBS[d]).replace(/·([₀-₉]+)/, (m, n) => '·' + n.replace(/[₀-₉]/g, (c) => SUBS.indexOf(c)));
+export function equationOf(rx) {
+  const side = (list) => list.map(({ id, mol }) => (mol === 1 ? '' : mol + ' ') + pretty(SUB[id].display || SUB[id].formula || SUB[id].name)).join(' + ');
+  return side(rx.inputs) + ' → ' + side(rx.outputs);
+}
+// attach equation and reaction type to each reaction's discovery (the first reaction that leads to it)
+for (const rx of RX) {
+  const d = DISC[rx.discovery];
+  if (d && !d.eq) { d.eq = equationOf(rx); d.kind = rx.kind; }
+}
 export const DISC_LIST = Object.values(DISC);
 
 // pairs of substances that have a reaction together (used to decide whether a solid dropped in a puddle joins it)

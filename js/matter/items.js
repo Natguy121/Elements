@@ -63,6 +63,9 @@ export function createMatter(G) {
     return (geoCache[type] = { outer, inner, rim });
   }
   const DARK = new THREE.Color(0x0b0f12);
+  const crystalGeo = new THREE.OctahedronGeometry(1, 0);
+  const xtalMats = {};
+  const crystalMat = (c) => (xtalMats[c] ||= new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.06, metalness: 0, clearcoat: 1, transparent: true, opacity: 0.9, flatShading: true, envMapIntensity: 1.4 }));
   // spills spread into irregular blobs, not perfect circles
   function blobGeo() {
     const sh = new THREE.Shape(), n = 26, ph = [Math.random() * 6, Math.random() * 6, Math.random() * 6];
@@ -554,6 +557,23 @@ export function createMatter(G) {
       }
     }
     for (; pi < it.pieces.length; pi++) it.pieces[pi].visible = false;
+    // crystals that grew out of the solution, sitting on the bottom of the glass
+    if (a.crystals && a.crystals.length) {
+      if (!it.xtals) { it.xtals = []; for (let i = 0; i < 9; i++) { const m = new THREE.Mesh(crystalGeo, crystalMat('#ffffff')); m.visible = false; m.castShadow = true; scene.add(m); it.xtals.push(m); it.extras.push(m); } }
+      let xi = 0;
+      for (const c of a.crystals) {
+        const n = Math.min(9 - xi, 4 + Math.min(5, Math.floor(c.vol * 1000 / 4)));
+        const size = Math.max(0.003, Math.cbrt(c.vol * 0.001 / n) * 1.25), r0 = d.rAt(d.inner[0][1]) * 0.72, mat = crystalMat(SUB[c.id].color);
+        for (let j = 0; j < n && xi < 9; j++, xi++) {
+          const m = it.xtals[xi], ang = j * 2.4 + it.id, rad = j === 0 ? 0 : r0 * (0.35 + 0.6 * ((j * 0.37) % 1));
+          m.visible = true; m.material = mat;
+          m.scale.set(size * (0.8 + (j % 3) * 0.2), size * (1.1 + (j % 2) * 0.5), size);
+          t1.set(Math.cos(ang) * rad, d.inner[0][1] + size * 0.5, Math.sin(ang) * rad).applyQuaternion(it.group.quaternion).add(base);
+          m.position.copy(t1); m.rotation.set(j * 0.7, j * 1.9 + it.id, j * 0.4);
+        }
+      }
+      for (; xi < 9; xi++) it.xtals[xi].visible = false;
+    } else if (it.xtals) for (const m of it.xtals) m.visible = false;
 
     // pouring: liquid leaves when its surface is above the lowest point of the rim
     it.flowing = 0;

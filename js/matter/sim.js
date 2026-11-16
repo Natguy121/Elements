@@ -48,7 +48,7 @@ export function createSim(G) {
         mix.T += (s.T - mix.T) * (1 - Math.exp(-s.k * TICK / Math.max(C, 0.05)));
       }
       for (const pl of G.plates) {
-        if (pl.T <= 25 || base.x < pl.x0 || base.x > pl.x1 || base.z < pl.z0 || base.z > pl.z1 || Math.abs(base.y - pl.y) > 0.03) continue;
+        if (Math.abs(pl.T - 20) < 1.5 || base.x < pl.x0 || base.x > pl.x1 || base.z < pl.z0 || base.z > pl.z1 || Math.abs(base.y - pl.y) > 0.03) continue;
         mix.T += (pl.T - mix.T) * (1 - Math.exp(-pl.k * TICK / Math.max(C, 0.05)));
       }
       const T0 = mix.T;
@@ -86,6 +86,28 @@ export function createSim(G) {
       if (h.fx) { for (const k in h.fx) if (h.fx[k].t !== undefined) h.fx[k].t -= TICK; }
       if (h.lit > 0) h.lit -= TICK;
 
+      // crystals: a dissolved solid that comes back out as the solution cools or dries
+      if (mix.n.water || h.prevDis) {
+        h.prevDis = h.prevDis || {};
+        for (const id in mix.n) {
+          const s = SUB[id];
+          if (s.state !== 's' || !s.sol || s.look !== 'crystal') continue;
+          const dNow = mix.dissolvedMol(id), prev = h.prevDis[id], left = mix.n[id] - dNow;
+          if (prev !== undefined && dNow < prev - 2e-5 && left > 2e-5 && !mix.xt[id]) {
+            mix.xt[id] = true; h.dirty = true;
+            G.hooks.discover(mix.T < (h.prevT ?? mix.T) - 0.01 ? 'obs_cryst_cool' : 'obs_crystals', h);
+          }
+          if (left <= 1e-7 && mix.xt[id]) { delete mix.xt[id]; h.dirty = true; }
+          h.prevDis[id] = dNow;
+        }
+        h.prevT = mix.T;
+      }
+      // an indicator changing colour as the pH crosses neutral is the endpoint of a neutralisation
+      if (h.an && h.an.pH !== null && h.an.indicators && h.an.indicators.length) {
+        const side = h.an.pH < 6 ? -1 : h.an.pH > 8 ? 1 : 0;
+        if (side && h.phSide && side !== h.phSide) G.hooks.discover('obs_endpoint', h);
+        if (side) h.phSide = side;
+      }
       if (h.kind === 'lump') {
         const s = SUB[h.sub];
         if (s.look === 'metal' && mix.T > 560) G.hooks.discover('obs_redhot');
@@ -246,9 +268,9 @@ export function createSim(G) {
   }
 
   function update(dt) {
-    acc += Math.min(dt, 0.2);
+    acc += Math.min(dt, 0.2) * (G.timeScale || 1);
     let n = 0;
-    while (acc >= TICK && n++ < 4) { tick(); acc -= TICK; }
+    while (acc >= TICK && n++ < 30) { tick(); acc -= TICK; }
     visuals(dt);
   }
   return { update, levels, progress, get glare() { return glare; }, TICK };

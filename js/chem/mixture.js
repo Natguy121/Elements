@@ -7,6 +7,19 @@ import { SUB, stateAt } from './db.js';
 const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 const toHex = (c) => '#' + c.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
 const PH_COLORS = [[0, '#d3202a'], [3, '#e8582a'], [5, '#f0b030'], [6.5, '#b8cc3a'], [7, '#3fae4f'], [8.5, '#2a9a9a'], [10, '#2a5fc8'], [12, '#5a2fb0'], [14, '#4a1f8a']];
+// colour maps for the other indicators: [pH, colour, how strongly it tints]
+const IND = {
+  cabbage: [[0, '#c8102e', 1], [2, '#e0306a', 1], [4, '#b8478f', 1], [6, '#7c4fa8', 1], [7, '#5a56b0', 1], [8, '#3f6fc4', 1], [9, '#2f8fb0', 1], [10, '#2fa070', 1], [12, '#8cb52a', 1], [14, '#e0c81a', 1]],
+  phph: [[0, '#ffffff', 0], [8.1, '#ffffff', 0], [8.6, '#f05aa8', 0.6], [10, '#e8268a', 1], [13, '#e8268a', 1], [14, '#f2a0c8', 0.4]],
+};
+export function indicatorColor(type, pH) {
+  if (type === 'universal' || !IND[type]) return [phColor(pH), 1];
+  const m = IND[type];
+  for (let i = 1; i < m.length; i++) if (pH <= m[i][0]) { const k = (pH - m[i - 1][0]) / (m[i][0] - m[i - 1][0]), x = hex(m[i - 1][1]), y = hex(m[i][1]); return [toHex(x.map((v, j) => v + (y[j] - v) * k)), m[i - 1][2] + (m[i][2] - m[i - 1][2]) * k]; }
+  return [m[m.length - 1][1], m[m.length - 1][2]];
+}
+// solubility in g per 100 g of water: some solids dissolve far more when hot (that is what makes crystals grow on cooling)
+export const solAt = (s, T) => (s.solHot !== undefined ? Math.max(0, s.sol + (s.solHot - s.sol) * (Math.min(100, Math.max(0, T)) - 20) / 80) : s.sol);
 export function phColor(pH) {
   for (let i = 1; i < PH_COLORS.length; i++) {
     if (pH <= PH_COLORS[i][0]) {
@@ -26,6 +39,7 @@ export class Mixture {
     this.T = T;         // degrees C
     this.extraC = 0;    // heat capacity of whatever holds the mixture (J/K)
     this.burning = {};  // reaction id -> true once a self-sustaining reaction has started
+    this.xt = {};       // id -> true for a solid that came out of solution as crystals
   }
   get(id) { return this.n[id] || 0; }
   ids() { return Object.keys(this.n); }
@@ -47,11 +61,12 @@ export class Mixture {
   }
   remove(id, mol) {
     const left = (this.n[id] || 0) - mol;
-    if (left > 1e-9) this.n[id] = left; else { delete this.n[id]; delete this.surf[id]; }
+    if (left > 1e-9) this.n[id] = left; else { delete this.n[id]; delete this.surf[id]; delete this.xt[id]; }
   }
   merge(o) {
     for (const id in o.n) this.add(id, o.n[id], o.T, o.surf[id]);
     for (const k in o.burning) this.burning[k] = true;
+    for (const k in o.xt) this.xt[k] = true;
   }
   surfOf(id) { return this.surf[id] ?? POWDER; }
   isChunk(id) { return SUB[id].state === 's' && this.surfOf(id) < 0.5; }
@@ -61,7 +76,7 @@ export class Mixture {
     const s = SUB[id], n = this.n[id] || 0;
     if (!n || !s.sol || this.isChunk(id)) return 0;
     const waterG = this.grams('water');
-    return Math.min(n, (s.sol / 100) * waterG / s.M);
+    return Math.min(n, (solAt(s, this.T) / 100) * waterG / s.M);
   }
 
   // Sort the contents into what you would actually see: liquid layers, sediment, lumps.
@@ -71,7 +86,8 @@ export class Mixture {
     const col = { aq: [0, 0, 0, 0, 0], org: [0, 0, 0, 0, 0], sed: [0, 0, 0, 0, 0], metal: [0, 0, 0, 0, 0] };
     const mix = (k, hexc, w, alpha = 1) => { const c = hex(hexc), a = col[k]; a[0] += c[0] * w; a[1] += c[1] * w; a[2] += c[2] * w; a[3] += w; a[4] += alpha * w; };
     const chunks = [], melts = [];
-    let cloud = 0, hasIndicator = 0;
+    let cloud = 0; const inds = {};
+    const crystals = [];
     for (const id in this.n) {
       const s = SUB[id], n = this.n[id], st = stateAt(s, T);
       const vol = s.density ? n * s.M / s.density / 1000 : 0; // litres
@@ -81,13 +97,14 @@ export class Mixture {
         if (s.state === 's') { melts.push({ id, vol, density: s.density, color: s.id === 'sulfur' ? (T > 160 ? '#b8501a' : '#e0b820') : s.color }); L.org += 0; continue; }
         const k = s.phase === 'organic' ? 'org' : s.phase === 'metal' ? 'metal' : 'aq';
         L[k] += vol;
-        if (id === 'indicator') hasIndicator += vol;
+        if (s.indicator) inds[s.indicator] = (inds[s.indicator] || 0) + vol;
         else mix(k, s.color, vol * (s.tint || 1), s.alpha ?? 0.4);
         continue;
       }
       // solid powder
       const d = this.dissolvedMol(id), rest = n - d;
       if (d > 0) { L.aq += d * s.M / s.density / 1000 * 0.55; if (s.tint) mix('aq', s.color, d * s.M / 1000 * s.tint, 0.9); }
+      if (rest > 1e-7 && this.xt[id] && this.n.water) { crystals.push({ id, mol: rest, vol: rest * s.M / s.density / 1000 }); continue; }
       if (rest > 1e-7) {
         const v = rest * s.M / s.density / 1000 / 0.62; // loose packing
         if (s.cloud && this.n.water) { cloud += v * s.cloud; L.sed += v * 0.35; mix('sed', s.color, v * 0.35); }
@@ -103,8 +120,8 @@ export class Mixture {
     if (L.aq > 1e-7) {
       const a = fin('aq', '#bfe3f2', 0.28);
       pH = this.pH(L.aq);
-      if (hasIndicator > 0) {
-        const w = Math.min(1, hasIndicator / L.aq * 250), c1 = hex(a.color), c2 = hex(phColor(pH));
+      for (const type in inds) {
+        const [cHex, strength] = indicatorColor(type, pH), w = Math.min(1, inds[type] / L.aq * 250) * strength, c1 = hex(a.color), c2 = hex(cHex);
         a.color = toHex(c1.map((v, i) => v + (c2[i] - v) * w)); a.alpha = a.alpha + (0.8 - a.alpha) * w;
       }
       const cl = Math.min(1, cloud / L.aq * 25);
@@ -121,7 +138,7 @@ export class Mixture {
       c.floatOn = null;
       for (const l of layers) if (l.key !== 'sed' && l.density > c.density) { c.floatOn = l.key; break; }
     }
-    return { layers, chunks, total, liquid, pH, top, cloud };
+    return { layers, chunks, total, liquid, pH, top, cloud, crystals, indicators: Object.keys(inds) };
   }
 
   // Simplified pH: strong bases, one weak acid family, and buffer salts.
@@ -129,17 +146,23 @@ export class Mixture {
     if (!this.n.water) return null;
     const V = aqVol ?? this.analyse().layers.find((l) => l.key === 'aq')?.vol;
     if (!V) return null;
-    let oh = 0, acid = 0, pKa = 4.76, salt = null;
+    // strong acids and bases are fully ionised; weak acids only partly; some salts lean a little either way
+    let oh = 0, strong = 0, weak = 0, pKa = 4.76, salt = null;
     for (const id in this.n) {
-      const s = SUB[id];
-      if (s.base) oh += s.base.oh * (s.state === 's' ? this.dissolvedMol(id) : this.n[id]);
-      else if (s.acid) { acid += this.n[id]; pKa = s.acid.pKa; }
-      else if (s.ph && this.dissolvedMol(id) / V > 0.005 && (salt === null || Math.abs(s.ph - 7) > Math.abs(salt - 7))) salt = s.ph;
+      const s = SUB[id], amt = s.state === 's' ? this.dissolvedMol(id) : this.n[id];
+      if (s.base) oh += s.base.oh * amt;
+      else if (s.acid) { if (s.acid.strong) strong += amt * (s.acid.h || 1); else { weak += amt; pKa = Math.min(pKa, s.acid.pKa); } }
+      else if (s.ph && amt / V > 0.005 && (salt === null || Math.abs(s.ph - 7) > Math.abs(salt - 7))) salt = s.ph;
     }
-    const cb = oh / V, ca = acid / V;
-    if (cb > ca + 1e-7) return Math.min(14, 14 + Math.log10(cb - ca));
-    if (ca > 1e-7 && cb > 1e-7) return Math.max(0, pKa + Math.log10(cb / (ca - cb + 1e-9)));
-    if (ca > 1e-7) { const p = 0.5 * (pKa - Math.log10(ca)); return salt !== null && salt > 7 ? Math.min(7, p + 2) : p; }
+    const cs = strong / V, cb = oh / V, cw = weak / V, net = cs - cb;
+    if (net > 1e-7) return Math.max(0, -Math.log10(net));
+    const exOH = -net;
+    if (cw > 1e-7) {
+      if (exOH >= cw) { const r = exOH - cw; return r > 1e-6 ? Math.min(14, 14 + Math.log10(r)) : 8.6; }
+      if (exOH > 1e-9) return Math.max(0, pKa + Math.log10(exOH / (cw - exOH)));
+      const p = 0.5 * (pKa - Math.log10(cw)); return salt !== null && salt > 7 ? Math.min(7, p + 2) : p;
+    }
+    if (exOH > 1e-7) return Math.min(14, 14 + Math.log10(exOH));
     return salt ?? 7;
   }
 
@@ -155,6 +178,7 @@ export class Mixture {
       this.remove(id, m);
     }
     for (const k in this.burning) out.burning[k] = true;
+    for (const k in this.xt) out.xt[k] = true;
     return out;
   }
   pourableL() { const a = this.analyse(); return a.total; }

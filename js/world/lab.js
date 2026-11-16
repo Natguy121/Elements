@@ -186,6 +186,26 @@ export function buildLab(G) {
     if (plate.lcdT <= 0) { plate.lcdT = 0.5; plateLcd.set(plate.set ? Math.round(plate.T) + ' C' : (plate.T > 45 ? Math.round(plate.T) + ' C' : 'OFF'), plate.T > 45 ? 'CAUTION: HOT SURFACE' : 'HOT PLATE'); }
   });
 
+  // ---------- chiller plate: a cold version of the hot plate, for growing crystals ----------
+  const cx = -0.6, cz = NZ0 + 0.42;
+  block(0.3, 0.08, 0.3, std({ color: 0xc9d6dc, roughness: 0.45 }), cx, BENCH + 0.04, cz);
+  const chillMat = std({ color: 0x8c979e, roughness: 0.35, metalness: 0.8 });
+  deco(0.24, 0.008, 0.24, chillMat, cx, BENCH + 0.084, cz);
+  const cKnob = cyl(0.02, 0.02, 0.02, M.dark, cx - 0.08, BENCH + 0.04, cz + 0.155); cKnob.rotation.x = Math.PI / 2;
+  const chillLcd = T.lcdTex(256, 96);
+  mesh(new THREE.PlaneGeometry(0.11, 0.04), new THREE.MeshBasicMaterial({ map: chillLcd }), cx + 0.06, BENCH + 0.04, cz + 0.1515, false);
+  const CL = [20, 5, -5], CN = ['OFF', 'COLD', 'ICE'];
+  const chill = { x0: cx - 0.13, x1: cx + 0.13, z0: cz - 0.13, z1: cz + 0.13, y: BENCH + 0.088, T: 20, set: 0, k: 9 };
+  G.plates.push(chill);
+  chillLcd.set('OFF', 'CHILLER PLATE');
+  fixtures.push({ pos: V(cx - 0.08, BENCH + 0.05, cz + 0.16), r: 0.16, name: 'Chiller plate', hint: () => `Chiller: ${CN[chill.set]}. Turn the dial`, use: () => { chill.set = (chill.set + 1) % 3; cKnob.rotation.z -= 1.2; play('click', V(cx, BENCH, cz)); } });
+  updaters.push((dt) => {
+    chill.T += (CL[chill.set] - chill.T) * Math.min(1, dt * 0.1);
+    chillMat.color.setRGB(0.55 + Math.max(0, 8 - chill.T) * 0.02, 0.6 + Math.max(0, 8 - chill.T) * 0.02, 0.64 + Math.max(0, 8 - chill.T) * 0.025); // frost
+    chill.lcdT = (chill.lcdT || 0) - dt;
+    if (chill.lcdT <= 0) { chill.lcdT = 0.5; chillLcd.set(chill.set ? Math.round(chill.T) + ' C' : 'OFF', 'CHILLER PLATE'); }
+  });
+
   // ---------- balance ----------
   const bx = 0.1, bz = NZ0 + 0.42;
   block(0.3, 0.06, 0.32, M.white, bx, BENCH + 0.03, bz);
@@ -296,6 +316,17 @@ export function buildLab(G) {
     supplyJar('jar', 'yeast', 0.4, 2.85, A, -0.3, { formula: 'catalase', ry: Math.PI });
     supplyJar('dropper', 'indicator', 0.06, 3.2, A, -0.3, { formula: 'pH 1-14', ry: Math.PI });
     supplyJar('bottle', 'soap', 1.4, 3.3, A, 0.3, { formula: 'surfactant' });
+    // teaching cabinet: dilute acid and alkali, indicators and crystal-growing salts (north bench, right)
+    const NB = NZ0 + 0.42;
+    supplyJar('bottle', 'hcl', 0.5, 0.55, A, NB, { extra: [['water', 26]], formula: 'HCl 1 M', accent: '#d3202a' });
+    supplyJar('bottle', 'naoh', 0.5, 0.85, A, NB, { extra: [['water', 26]], label: 'Sodium hydroxide', formula: 'NaOH 1 M', accent: '#4a3fb0' });
+    supplyJar('jar', 'citric', 1.0, 1.17, A, NB, { accent: '#d3202a' });
+    supplyJar('jar', 'caco3', 2.0, 1.49, A, NB, { surf: CHUNK, pieceMol: 0.03 });
+    supplyJar('jar', 'cuso4', 1.2, 1.81, A, NB, { formula: 'CuSO4·5H2O', accent: '#1f6fd8' });
+    supplyJar('jar', 'alum', 0.6, 2.13, A, NB, { formula: 'KAl(SO4)2·12H2O' });
+    supplyJar('bottle', 'cabbage', 0.06, 2.45, A, NB, { extra: [['water', 15]], formula: 'natural indicator', accent: '#5a3fa0' });
+    supplyJar('dropper', 'phph', 0.06, 2.72, A, NB, { formula: 'pH 8.2-10' });
+    supplyJar('dropper', 'indicator', 0.06, 2.9, A, NB, { formula: 'pH 1-14' });
     supplyJar('dropper', 'dye_blue', 0.03, 3.36, A, -0.18, { formula: '', ry: Math.PI });
     supplyJar('jar', 'sucrose', 0.6, 1.0, A, 0.3);
     supplyJar('jar', 'nacl', 3.4, 1.34, A, 0.3);

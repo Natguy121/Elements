@@ -69,6 +69,23 @@ Unit tests check every reaction for atom and mass balance.
 
 Large pieces of sodium or potassium explode.
 
+**Acids, bases, indicators and crystals** (added after feedback from a chemistry teacher). A teaching cabinet on the back bench holds:
+- 1 M hydrochloric acid and 1 M sodium hydroxide
+- citric acid and marble chips
+- copper sulfate and alum for growing crystals
+- universal indicator, red cabbage juice and phenolphthalein
+
+pH is calculated for strong and weak acids and bases, so a titration flips sharply at the endpoint. Solubility depends on temperature: dissolve copper sulfate or alum in hot water on the hot plate, cool it on the chiller plate, and crystals grow in the glass. Press Z to fast-forward chemistry and heat (×4, ×16) for slow reactions and cooling. New reactions:
+- strong acid with strong base
+- acid with carbonate (baking soda, marble)
+- acid with metal (magnesium, iron)
+- acid with copper oxide
+- citric acid with baking soda
+- metal displacement (an iron nail copper-plated in copper sulfate)
+- copper sulfate losing its water when heated and turning blue again with water, the test for water
+
+Every reaction in the Discovery Book shows its type (neutralisation, displacement...), its balanced equation and a short explanation of the science.
+
 **Discovery Book.** First-time reactions, new substances and observations (layers, dissolving, saturation, boiling, melting, red heat, iron floating on mercury...) trigger a banner with a real fact. The book lists every entry, with hints for those not found. It also has an interactive periodic table of all 118 elements with real data. The notebook logs each experiment with amounts and starting temperature.
 
 **The lab.** One room:

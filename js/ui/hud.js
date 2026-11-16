@@ -34,9 +34,9 @@ export function createHud(G) {
   function showBanner({ d, extra }) {
     const rare = d.rarity === 'rare' || d.rarity === 'uncommon';
     $('banner').className = 'banner' + (d.rarity === 'rare' ? ' rare' : '');
-    $('bannerKind').textContent = d.cat === 'Observations' ? 'Observation' : d.rarity === 'rare' ? 'Rare discovery' : 'New discovery';
+    $('bannerKind').textContent = (d.cat === 'Observations' ? 'Observation' : d.rarity === 'rare' ? 'Rare discovery' : 'New discovery') + (d.kind ? ' · ' + d.kind : '');
     $('bannerName').textContent = extra || d.name;
-    $('bannerFormula').innerHTML = d.formula ? sub2(esc(d.formula)) : esc(d.cat);
+    $('bannerFormula').innerHTML = d.eq ? esc(d.eq) : d.formula ? sub2(esc(d.formula)) : esc(d.cat);
     $('bannerFact').textContent = d.fact || '';
     $('banner').hidden = true; void $('banner').offsetWidth; $('banner').hidden = false;
     bannerT = d.cat === 'Observations' ? 4.5 : 6.5;
@@ -139,7 +139,7 @@ export function createHud(G) {
     $('entries').innerHTML = shown.map((d) => {
       const f = isFound(d), rec = save.found[d.id];
       if (!f) return `<article class="entry locked"><h4>${d.el ? esc(d.el.sym) + ' · ???' : '???'}</h4><p>${esc(d.hint || 'Not found yet.')}</p>${d.el && d.el.tier ? `<span class="who">Tier ${d.el.tier}</span>` : ''}</article>`;
-      return `<article class="entry ${d.rarity === 'rare' ? 'rare' : ''}"><h4>${esc(d.name)}</h4>${d.formula ? `<span class="f">${sub2(esc(d.formula))}</span>` : ''}<p>${esc(d.fact || '')}</p>
+      return `<article class="entry ${d.rarity === 'rare' ? 'rare' : ''}"><h4>${esc(d.name)}</h4>${d.kind ? `<span class="kind">${esc(d.kind)}</span>` : ''}${d.eq ? `<span class="f eq">${esc(d.eq)}</span>` : d.formula ? `<span class="f">${sub2(esc(d.formula))}</span>` : ''}<p>${esc(d.fact || '')}</p>
         <span class="who">${d.el ? 'In the store room from the start' : `Found by ${esc(rec.by)} · made ${rec.n} time${rec.n === 1 ? '' : 's'}`}</span></article>`;
     }).join('') || '<p style="color:var(--mute)">Nothing here yet.</p>';
   }

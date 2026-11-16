@@ -1,0 +1,17 @@
+{
+  "name": "reaction-lab",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A first-person chemistry sandbox: grab things, pour them together, find out.",
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "test": "node --test tests/chem.test.mjs",
+    "build": "node tools/build.mjs",
+    "elements": "node tools/gen-elements.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "periodic-table": "^0.0.8"
+  }
+}

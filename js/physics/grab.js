@@ -87,6 +87,8 @@ export function createGrab(phys, player, camera, hooks) {
     const wantPour = input.st.rmb && h.item.kind === 'vessel';
     h.pour += ((wantPour ? 1 : -1.6) * 1.15) * dt;
     h.pour = Math.max(0, Math.min(2.5, h.pour));
+    // while pouring, hold the container by its mouth so the mouth stays exactly where you aim
+    if (h.item.kind === 'vessel' && h.tool === 'hand') h.local.y = h.item.halfH * Math.min(1, h.pour / 0.45);
     if (input.down('KeyR')) { // rotate the held thing with the mouse
       qe.setFromAxisAngle(UP, input.st.lookX * 0.006); h.user.premultiply(qe);
       right.set(1, 0, 0); qe.setFromAxisAngle(right, input.st.lookY * 0.006); h.user.premultiply(qe);
@@ -109,8 +111,8 @@ export function createGrab(phys, player, camera, hooks) {
     if (h.strain > 0.5) player.stamina = Math.max(0, player.stamina - dt * (h.strain - 0.45) * 0.22);
     b.pointToWorldFrame(h.local, p);
     const err = Math.hypot(h.target.x - p.x, h.target.y - p.y, h.target.z - p.z);
-    h.stuck = err > 1.1 ? h.stuck + dt : 0;
-    if (h.stuck > 0.4) { hooks.onSlip && hooks.onSlip(h.item, 'It slipped out of reach.'); release(false); }
+    h.stuck = err > 2.4 ? h.stuck + dt : 0;
+    if (h.stuck > 0.5) { hooks.onSlip && hooks.onSlip(h.item, 'It slipped out of reach.'); release(false); }
     else if (player.stamina <= 0 && h.strain > 0.5) { hooks.onSlip && hooks.onSlip(h.item, 'Your grip gave out.'); release(false); }
   }
 
@@ -123,7 +125,11 @@ export function createGrab(phys, player, camera, hooks) {
     p.vsub(b.position, r);
     b.angularVelocity.cross(r, v); v.vadd(b.velocity, v);
     const wn = h.placing ? 9 : 15, kp = m * wn * wn, kd = 2 * m * wn * 0.85;
-    F.set(kp * (h.target.x - p.x) - kd * v.x, kp * (h.target.y - p.y) - kd * v.y + m * 9.81, kp * (h.target.z - p.z) - kd * v.z);
+    // a leash: you can only lead a heavy thing by so much, so it drags behind instead of flying out of your hands
+    let ex = h.target.x - p.x, ey = h.target.y - p.y, ez = h.target.z - p.z;
+    const el = Math.hypot(ex, ey, ez);
+    if (el > 0.9) { const k = 0.9 / el; ex *= k; ey *= k; ez *= k; }
+    F.set(kp * ex - kd * v.x, kp * ey - kd * v.y + m * 9.81, kp * ez - kd * v.z);
     const max = STRENGTH * (h.item.helpers ? 1 + h.item.helpers : 1), len = F.length();
     if (len > max) F.scale(max / len, F);
     b.applyForce(F, r);

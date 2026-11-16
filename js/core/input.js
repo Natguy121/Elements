@@ -25,9 +25,14 @@ export function createInput(canvas, ui) {
     if (st.mode !== 'lock') return;
     try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => { st.mode = 'tap'; ui.onMode('tap'); }); } catch (e) { st.mode = 'tap'; ui.onMode('tap'); }
   }
-  document.addEventListener('pointerlockchange', () => { st.locked = document.pointerLockElement === canvas; ui.onLock(st.locked); if (!st.locked) st.lmb = st.rmb = false; });
+  let skipMove = 0;
+  document.addEventListener('pointerlockchange', () => { st.locked = document.pointerLockElement === canvas; skipMove = 2; ui.onLock(st.locked); if (!st.locked) st.lmb = st.rmb = false; });
   document.addEventListener('pointerlockerror', () => { st.mode = 'tap'; ui.onMode('tap'); });
-  document.addEventListener('mousemove', (e) => { if (st.locked) { st.lookX += e.movementX; st.lookY += e.movementY; } });
+  document.addEventListener('mousemove', (e) => {
+    if (!st.locked) return;
+    if (skipMove > 0) { skipMove--; return; } // browsers report a bogus jump right after locking
+    st.lookX += Math.max(-160, Math.min(160, e.movementX)); st.lookY += Math.max(-160, Math.min(160, e.movementY));
+  });
   canvas.addEventListener('mousedown', (e) => {
     if (st.mode !== 'lock' || !st.enabled) return;
     if (!st.locked) { lock(); return; }

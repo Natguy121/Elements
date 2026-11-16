@@ -1,0 +1,563 @@
+import * as THREE from 'three';
+import { SUB, canReact, stateAt } from '../chem/db.js';
+import { Mixture, CHUNK } from '../chem/mixture.js';
+import { VESSELS, PROPS, heatGlow } from './defs.js';
+import { labelTex, woodTex, steelTex } from '../world/textures.js';
+import { play } from '../core/audio.js';
+import { G_STATIC, G_PROP, G_HELD } from '../physics/world.js';
+
+// Everything you can pick up, and everything that can be spilled.
+//   vessel : a container with an inside (beaker, jar, bottle...). Holds a Mixture.
+//   lump   : a loose solid piece (a pea of sodium, a nail, a gold bar). Is a Mixture of one thing.
+//   prop   : plain objects with no chemistry (crates, gas cylinder, drum, lighter).
+//   puddle : a spill on a fixed surface. Holds a Mixture too, so spills keep reacting.
+//   parcel : a blob of liquid or powder in flight between the above.
+
+const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
+const UP = V(0, 1, 0);
+const G9 = 9.81;
+
+export function createMatter(G) {
+  const { scene, phys } = G;
+  const { CANNON } = phys;
+  const items = new Set(), puddles = [], parcels = [], breakQueue = [];
+  let nextId = 1;
+  const cv = new CANNON.Vec3(), cv2 = new CANNON.Vec3(), cq = new CANNON.Vec3();
+  const t1 = V(), t2 = V(), t3 = V();
+
+  // ---------- shared materials ----------
+  const M = {
+    glass: new THREE.MeshPhysicalMaterial({ color: 0xeaf6f8, roughness: 0.03, metalness: 0, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false, envMapIntensity: 2.2, clearcoat: 1, clearcoatRoughness: 0.05 }),
+    amber: new THREE.MeshPhysicalMaterial({ color: 0x7a3d10, roughness: 0.05, transparent: true, opacity: 0.62, side: THREE.DoubleSide, depthWrite: false, envMapIntensity: 1.8, clearcoat: 1 }),
+    ceramic: new THREE.MeshStandardMaterial({ color: 0xeeebe2, roughness: 0.35, side: THREE.DoubleSide }),
+    shard: new THREE.MeshPhysicalMaterial({ color: 0xdff2f5, roughness: 0.05, transparent: true, opacity: 0.4, envMapIntensity: 2.2, side: THREE.DoubleSide }),
+    wood: new THREE.MeshStandardMaterial({ map: woodTex(), roughness: 0.75 }),
+    steel: new THREE.MeshStandardMaterial({ map: steelTex(), color: 0xc4c9cc, metalness: 1, roughness: 0.32 }),
+    cyl: new THREE.MeshPhysicalMaterial({ color: 0x3d4a52, metalness: 0.6, roughness: 0.38, clearcoat: 0.3 }),
+    drum: new THREE.MeshPhysicalMaterial({ color: 0x2f5a78, metalness: 0.7, roughness: 0.42, clearcoat: 0.2 }),
+    brass: new THREE.MeshStandardMaterial({ color: 0xcfa640, metalness: 1, roughness: 0.3 }),
+    black: new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.5 }),
+  };
+  const geoCache = {};
+  function vesselGeo(type) {
+    if (geoCache[type]) return geoCache[type];
+    const d = VESSELS[type];
+    const outer = new THREE.LatheGeometry([new THREE.Vector2(0.0005, 0), ...d.prof.map(([r, y]) => new THREE.Vector2(r, y))], 30);
+    const inner = new THREE.LatheGeometry([new THREE.Vector2(0.0005, d.inner[0][1]), ...d.inner.map(([r, y]) => new THREE.Vector2(r * 0.97, y)), new THREE.Vector2(d.rimR * 0.97, d.H + 0.05)], 26);
+    const rim = new THREE.TorusGeometry(d.prof[d.prof.length - 1][0], 0.0016, 6, 30);
+    return (geoCache[type] = { outer, inner, rim });
+  }
+  const discGeo = new THREE.CircleGeometry(1, 28); discGeo.rotateX(-Math.PI / 2);
+  const coneGeo = new THREE.ConeGeometry(1, 1, 22); coneGeo.translate(0, 0.5, 0);
+  const pieceGeo = new THREE.IcosahedronGeometry(1, 1);
+  { const p = pieceGeo.attributes.position; for (let i = 0; i < p.count; i++) { const n = 1 + 0.16 * Math.sin(p.getX(i) * 9 + p.getY(i) * 5) + 0.1 * Math.sin(p.getZ(i) * 11); p.setXYZ(i, p.getX(i) * n, p.getY(i) * n * 0.85, p.getZ(i) * n); } pieceGeo.computeVertexNormals(); }
+  const subMat = {};
+  function lumpMaterial(id) {
+    const s = SUB[id];
+    const metal = s.look === 'metal';
+    return new THREE.MeshStandardMaterial({ color: s.color, metalness: metal ? 1 : 0.05, roughness: metal ? (id === 'gold' ? 0.22 : 0.36) : 0.75, flatShading: id !== 'gold' && id !== 'mercury', emissive: 0x000000 });
+  }
+  const pieceMat = (id) => (subMat[id] ||= lumpMaterial(id));
+
+  // ---------- registry ----------
+  function register(it) {
+    it.id = nextId++;
+    it.body.item = it;
+    it.lastHit = 0;
+    it.body.addEventListener('collide', (e) => onCollide(it, e));
+    items.add(it);
+    scene.add(it.group);
+    return it;
+  }
+  function onCollide(it, e) {
+    const sp = Math.abs(e.contact.getImpactVelocityAlongNormal());
+    if (sp < 0.5) return;
+    const now = G.time;
+    if (it.breakV && sp > it.breakV && !it.dead && !it.breaking) {
+      const soft = e.body.item && e.body.item.kind === 'lump' && e.body.mass < 0.05; // a pea of sodium does not smash a beaker
+      if (!soft) { it.breaking = true; breakQueue.push(it); return; }
+    }
+    if (now - it.lastHit < 0.09) return;
+    it.lastHit = now;
+    const pos = it.body.position, loud = Math.min(1.4, sp * 0.22 * (0.5 + Math.min(1.5, it.body.mass * 0.15)));
+    play(it.sound || 'thud', pos, loud);
+    if (it.body.mass > 15 && sp > 1.6) G.hooks.shake(Math.min(0.5, it.body.mass * sp * 0.0016), pos);
+  }
+  function remove(it) {
+    if (it.dead) return;
+    it.dead = true;
+    items.delete(it);
+    scene.remove(it.group);
+    if (it.extras) for (const m of it.extras) scene.remove(m);
+    phys.world.removeBody(it.body);
+  }
+
+  // ---------- vessels ----------
+  function makeVessel(type, o = {}) {
+    const d = VESSELS[type], g = vesselGeo(type);
+    const group = new THREE.Group();
+    const wallMat = d.mat === 'ceramic' ? M.ceramic : o.glass === 'amber' ? M.amber : M.glass;
+    const shell = new THREE.Mesh(g.outer, wallMat); shell.renderOrder = 3; shell.castShadow = d.mat === 'ceramic'; group.add(shell);
+    const rim = new THREE.Mesh(g.rim, wallMat); rim.rotation.x = Math.PI / 2; rim.position.y = d.H; rim.renderOrder = 3; group.add(rim);
+    const layers = [];
+    for (let i = 0; i < 4; i++) {
+      const top = new THREE.Plane(V(0, -1, 0), 0), bot = new THREE.Plane(V(0, 1, 0), 0);
+      const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.12, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false, clippingPlanes: [top, bot] });
+      const m = new THREE.Mesh(g.inner, mat); m.renderOrder = 1; m.visible = false; group.add(m);
+      layers.push({ m, mat, top, bot });
+    }
+    const surface = new THREE.Mesh(discGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.04, transparent: true, opacity: 0.6, depthWrite: false, envMapIntensity: 2 }));
+    surface.renderOrder = 2; surface.visible = false; scene.add(surface);
+    const pieces = [];
+    for (let i = 0; i < 6; i++) { const m = new THREE.Mesh(pieceGeo, pieceMat('iron')); m.visible = false; m.castShadow = true; scene.add(m); pieces.push(m); }
+    let label = null;
+    if (d.label && o.label) {
+      const r = d.prof[2][0] + 0.0006, h = Math.min(0.06, d.prof[2][1] * 0.6);
+      label = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 20, 1, true, -1.15, 2.3), new THREE.MeshStandardMaterial({ map: labelTex(o.label, o.formula || '', o.tags || [], o.accent), roughness: 0.7 }));
+      label.position.y = d.prof[1][1] + h / 2 + 0.012; label.renderOrder = 4;
+      group.add(label);
+    }
+    const body = phys.dynamicBody(new CANNON.Cylinder(Math.max(d.prof[d.prof.length - 1][0], d.maxR * 0.6), d.prof[1][0], d.H, 10), d.mass, new CANNON.Vec3(0, 1, 0), d.mat === 'ceramic' ? phys.mats.matGround : phys.mats.matGlass);
+    const mix = new Mixture(20);
+    mix.extraC = d.heatC;
+    const it = register({
+      kind: 'vessel', type, def: d, group, body, mix, name: o.label || d.name, label: o.label || null, layers, surface, pieces, extras: [surface, ...pieces],
+      halfH: d.H / 2, pickR: Math.max(d.maxR, 0.03) + 0.015, breakV: d.breakV, sound: d.mat === 'ceramic' ? 'clink' : 'clink', dirty: true, an: null,
+      up: V(0, 1, 0), base: V(), foam: 0, pourAcc: 0, pourT: 0, pieceMol: {}, pieceShape: {}, air: d.air ?? 0.6, skitter: 0, flowing: 0, supply: !!o.label,
+    });
+    return it;
+  }
+  function fill(it, id, mol, surf, pieceMol, shape) {
+    it.mix.add(id, mol, 20, surf);
+    if (pieceMol) { it.pieceMol[id] = pieceMol; it.pieceShape[id] = shape || 'chunk'; }
+    it.dirty = true;
+  }
+  function place(it, x, y, z, ry = 0) {
+    const h = it.halfH ?? 0;
+    it.body.position.set(x, y + h + 0.002, z);
+    it.body.quaternion.setFromEuler(0, ry, 0);
+    it.body.velocity.set(0, 0, 0); it.body.angularVelocity.set(0, 0, 0);
+    it.body.sleep();
+    sync(it);
+    return it;
+  }
+
+  // ---------- lumps ----------
+  function makeLump(id, mol, o = {}) {
+    const s = SUB[id], massKg = mol * s.M / 1000, volM3 = massKg / (s.density * 1000);
+    const shape = o.shape || 'chunk';
+    let geo, phShape, halfH, pickR;
+    const mat = lumpMaterial(id);
+    if (shape === 'ingot') {
+      const k = Math.cbrt(volM3 / (3.2 * 1 * 1.15)), w = 3.2 * k, h = k, dd = 1.15 * k;
+      geo = new THREE.BoxGeometry(w, h, dd, 1, 1, 1);
+      const p = geo.attributes.position; for (let i = 0; i < p.count; i++) if (p.getY(i) > 0) p.setXYZ(i, p.getX(i) * 0.9, p.getY(i), p.getZ(i) * 0.82);
+      geo.computeVertexNormals();
+      phShape = new CANNON.Box(new CANNON.Vec3(w / 2, h / 2, dd / 2)); halfH = h / 2; pickR = Math.max(w, dd) * 0.45;
+      mat.flatShading = false;
+    } else if (shape === 'ribbon' || shape === 'nail') {
+      const len = shape === 'nail' ? 0.05 : 0.07, a = Math.sqrt(volM3 / len), w = shape === 'nail' ? a : a * 2.4, h = shape === 'nail' ? a : a / 2.4;
+      geo = shape === 'nail' ? new THREE.CylinderGeometry(a * 0.55, a * 0.4, len, 8).rotateZ(Math.PI / 2) : new THREE.BoxGeometry(len, h, w, 6, 1, 1);
+      if (shape === 'ribbon') { const p = geo.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, p.getY(i) + Math.sin(p.getX(i) * 90) * 0.0025); geo.computeVertexNormals(); }
+      phShape = new CANNON.Box(new CANNON.Vec3(len / 2, Math.max(0.004, h / 2 + 0.002), Math.max(0.005, w / 2))); halfH = Math.max(0.004, h / 2 + 0.002); pickR = len * 0.55;
+    } else {
+      const r = Math.max(0.0055, Math.cbrt(volM3 * 3 / (4 * Math.PI)));
+      geo = pieceGeo; phShape = new CANNON.Sphere(r * 0.92); halfH = r * 0.85; pickR = r + 0.012;
+      o.scale = r;
+    }
+    const mesh = new THREE.Mesh(geo, mat); mesh.castShadow = true;
+    if (o.scale) mesh.scale.setScalar(o.scale);
+    const group = new THREE.Group(); group.add(mesh);
+    const body = phys.dynamicBody(phShape, massKg, new CANNON.Vec3(0, 1, 0), s.look === 'metal' ? phys.mats.matMetal : phys.mats.matGround);
+    body.angularDamping = shape === 'chunk' ? 0.75 : 0.3; body.linearDamping = 0.06;
+    const mix = new Mixture(o.T ?? 20);
+    mix.add(id, mol, o.T ?? 20, o.surf ?? CHUNK);
+    return register({
+      kind: 'lump', sub: id, shape, group, body, mix, mesh, mat, name: s.name + (shape === 'ingot' ? ' bar' : shape === 'ribbon' ? ' ribbon' : shape === 'nail' ? ' nail' : massKg > 0.02 ? ' lump' : ''),
+      halfH, pickR, sound: s.look === 'metal' ? (massKg > 3 ? 'heavy' : 'metal') : 'thud', air: 1, mol0: mol, baseColor: new THREE.Color(s.color), small: massKg < 0.08,
+    });
+  }
+
+  // ---------- props ----------
+  function makeProp(type) {
+    const d = PROPS[type], group = new THREE.Group();
+    let shape, halfH;
+    if (d.shape === 'box') {
+      const [w, h, dd] = d.size;
+      if (d.look === 'lighter') {
+        const m = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.014, h * 0.6, 12), M.black); m.position.y = -h * 0.2; group.add(m);
+        const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, h * 0.5, 8), M.steel); tube.position.y = h * 0.25; group.add(tube);
+        const btn = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.02, 0.008), new THREE.MeshStandardMaterial({ color: 0xc8201c, roughness: 0.4 })); btn.position.set(0, -h * 0.02, 0.014); group.add(btn);
+      } else {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, dd), M.wood); group.add(m);
+        const band = new THREE.Mesh(new THREE.BoxGeometry(w + 0.012, 0.03, dd + 0.012), M.steel); band.position.y = h * 0.3; group.add(band);
+        const band2 = band.clone(); band2.position.y = -h * 0.3; group.add(band2);
+      }
+      shape = new CANNON.Box(new CANNON.Vec3(w / 2, h / 2, dd / 2)); halfH = h / 2;
+    } else {
+      const [r, h] = d.size;
+      const mat = d.look === 'barrel' ? M.drum : M.cyl;
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, d.look === 'barrel' ? h : h * 0.86, 28), mat); m.position.y = d.look === 'barrel' ? 0 : -h * 0.07; group.add(m);
+      if (d.look === 'barrel') { for (const y of [-0.3, 0, 0.3]) { const ring = new THREE.Mesh(new THREE.TorusGeometry(r + 0.004, 0.012, 8, 30), mat); ring.rotation.x = Math.PI / 2; ring.position.y = y * h; group.add(ring); } const lid = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.96, r * 0.96, 0.01, 28), M.steel); lid.position.y = h / 2 - 0.02; group.add(lid); }
+      else { const sh = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 12, 0, 6.3, 0, 1.57), mat); sh.position.y = h * 0.36; group.add(sh); const valve = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.1, 12), M.brass); valve.position.y = h * 0.46; group.add(valve); const band = new THREE.Mesh(new THREE.CylinderGeometry(r + 0.002, r + 0.002, 0.14, 28, 1, true), new THREE.MeshStandardMaterial({ color: 0x1c1f22, roughness: 0.5 })); band.position.y = h * 0.28; group.add(band); }
+      shape = new CANNON.Cylinder(r, r, h, 14); halfH = h / 2;
+    }
+    group.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    const body = phys.dynamicBody(shape, d.mass, new CANNON.Vec3(0, 1, 0), d.sound === 'wood' ? phys.mats.matGround : phys.mats.matMetal);
+    if (d.mass > 20) { body.angularDamping = 0.35; body.linearDamping = 0.08; }
+    return register({ kind: 'prop', type, def: d, group, body, name: d.name, halfH, pickR: Math.max(d.size[0], d.shape === 'box' ? d.size[2] : d.size[0]) * 0.7, sound: d.sound, tool: type === 'lighter' ? 'lighter' : null });
+  }
+
+  // ---------- breaking glass ----------
+  const shardGeo = new THREE.BufferGeometry();
+  shardGeo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 1, 0, 0.2, 0.3, 0.1, 1, 0, 0, 0, 0.3, 0.1, 1, 1, 0, 0.2], 3)); shardGeo.computeVertexNormals();
+  const shards = [];
+  function shatter(it) {
+    if (it.dead) return;
+    const p = it.body.position, v = it.body.velocity;
+    play('shatter', p, 1.2);
+    G.hooks.discover('obs_broken');
+    const n = it.def.mat === 'ceramic' ? 5 : 9;
+    for (let i = 0; i < n; i++) {
+      const s = 0.012 + Math.random() * 0.03;
+      const m = new THREE.Mesh(shardGeo, it.def.mat === 'ceramic' ? M.ceramic : M.shard); m.scale.set(s, s * 0.6, s); m.castShadow = true;
+      const b = phys.dynamicBody(new CANNON.Box(new CANNON.Vec3(s * 0.45, 0.003, s * 0.45)), 0.006, new CANNON.Vec3(p.x + (Math.random() - 0.5) * 0.05, p.y + Math.random() * 0.05, p.z + (Math.random() - 0.5) * 0.05), phys.mats.matGlass);
+      b.velocity.set(v.x * 0.5 + (Math.random() - 0.5) * 1.6, Math.random() * 1.4, v.z * 0.5 + (Math.random() - 0.5) * 1.6);
+      b.angularVelocity.set(Math.random() * 14, Math.random() * 14, Math.random() * 14);
+      scene.add(m); shards.push({ m, b, life: 40 });
+    }
+    while (shards.length > 70) { const s = shards.shift(); scene.remove(s.m); phys.world.removeBody(s.b); }
+    G.P.burst(14, () => ({ pos: V(p.x, p.y, p.z), vel: V((Math.random() - 0.5) * 3, Math.random() * 2.2, (Math.random() - 0.5) * 3), gravity: 9, life: 0.4 + Math.random() * 0.4, size: 0.012 + Math.random() * 0.02, color: 0xeaf6ff, boost: 2, add: true, tex: 'spark' }));
+    spillAll(it, 1.4);
+    remove(it);
+  }
+  // throw the whole contents out as flying blobs (broken or blown apart)
+  function spillAll(it, speed = 1) {
+    const p = it.body.position;
+    for (const id of it.mix.ids()) {
+      if (!it.mix.isChunk(id)) continue;
+      const per = it.pieceMol[id] || it.mix.n[id], count = Math.max(1, Math.min(8, Math.round(it.mix.n[id] / per)));
+      for (let i = 0; i < count; i++) { const l = makeLump(id, it.mix.n[id] / count, { shape: it.pieceShape[id], T: it.mix.T }); l.body.position.set(p.x + (Math.random() - 0.5) * 0.06, p.y + 0.02, p.z + (Math.random() - 0.5) * 0.06); l.body.velocity.set((Math.random() - 0.5) * speed, Math.random() * speed, (Math.random() - 0.5) * speed); }
+      it.mix.remove(id, it.mix.n[id]);
+    }
+    const total = it.mix.pourableL();
+    if (total > 0) {
+      const n = Math.max(1, Math.min(14, Math.ceil(total / 0.012)));
+      for (let i = 0; i < n; i++) emitParcel(it.mix.split(1 / (n - i)), V(p.x + (Math.random() - 0.5) * 0.05, p.y + Math.random() * 0.05, p.z + (Math.random() - 0.5) * 0.05), V((Math.random() - 0.5) * speed * 1.4, Math.random() * speed, (Math.random() - 0.5) * speed * 1.4));
+    }
+    it.dirty = true;
+  }
+
+  // ---------- parcels (liquid and powder in flight) ----------
+  const MAXP = 420;
+  const parcelMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 7, 5), new THREE.MeshStandardMaterial({ roughness: 0.15, transparent: true, opacity: 0.85, envMapIntensity: 1.6 }), MAXP);
+  parcelMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); parcelMesh.frustumCulled = false; parcelMesh.count = 0;
+  scene.add(parcelMesh);
+  const dm = new THREE.Object3D(), pc = new THREE.Color();
+  function emitParcel(mix, pos, vel, opt = {}) {
+    if (mix.isEmpty()) return;
+    const a = mix.analyse();
+    const top = a.top || { color: '#dddddd' };
+    const volL = Math.max(a.total, 1e-5);
+    parcels.push({ mix, x: pos.x, y: pos.y, z: pos.z, vx: vel.x, vy: vel.y, vz: vel.z, r: Math.min(0.018, Math.max(0.0035, Math.cbrt(volL * 0.001 * 0.24))), color: opt.color || top.color, life: 6, foam: !!opt.foam, src: opt.src || null, age: 0 });
+    if (parcels.length > MAXP) { const p = parcels.shift(); landOnGround(p); }
+  }
+  function landOnGround(p) { const hit = phys.raycast(p.x, p.y + 0.02, p.z, p.x, p.y - 4, p.z, G_STATIC); if (hit) spill(p.mix, hit.hitPointWorld.x, hit.hitPointWorld.y, hit.hitPointWorld.z); }
+  function inDrain(x, y, z) { for (const d of G.drains) if (x > d.x0 && x < d.x1 && z > d.z0 && z < d.z1 && y < d.y + 0.25 && y > d.y - 0.1) return true; return false; }
+  function updateParcels(dt) {
+    let n = 0;
+    for (let i = parcels.length - 1; i >= 0; i--) {
+      const p = parcels[i];
+      const ox = p.x, oy = p.y, oz = p.z;
+      p.vy -= G9 * dt; p.age += dt;
+      p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+      p.life -= dt;
+      let done = p.life <= 0 || p.y < -1;
+      // into a container?
+      if (!done && p.vy < 0.5) {
+        for (const it of items) {
+          if (it.kind !== 'vessel' || it === p.src && p.age < 0.25 || it.up.y < 0.45) continue;
+          const b = it.body.position, dx = p.x - b.x, dy = p.y - b.y, dz = p.z - b.z;
+          if (dx * dx + dy * dy + dz * dz > 0.09) continue;
+          cv.set(p.x, p.y, p.z); it.body.pointToLocalFrame(cv, cv2);
+          const hb = cv2.y + it.halfH, rad = Math.hypot(cv2.x, cv2.z), d = it.def;
+          if (hb > d.H - 0.045 && hb < d.H + 0.03 && rad < d.rimR + 0.004) {
+            if (!p.foam) { it.mix.merge(p.mix); it.dirty = true; it.changed = G.time; if (Math.random() < 0.3) play(p.r > 0.008 ? 'splash' : 'drip', b, 0.25); }
+            done = true; break;
+          }
+        }
+      }
+      if (!done) {
+        const hit = phys.raycast(ox, oy, oz, p.x, p.y, p.z, G_STATIC | G_PROP | G_HELD);
+        if (hit && !(hit.body.item === p.src && p.age < 0.25)) {
+          const hp = hit.hitPointWorld, ny = hit.hitNormalWorld.y, tgt = hit.body.item;
+          if (tgt && tgt.kind === 'vessel' && ny > 0.6 && Math.hypot(hp.x - (tgt.base.x + tgt.up.x * tgt.def.H), hp.z - (tgt.base.z + tgt.up.z * tgt.def.H)) < tgt.def.rimR + 0.004) {
+            if (!p.foam) { tgt.mix.merge(p.mix); tgt.dirty = true; tgt.changed = G.time; }
+            done = true;
+          } else if (ny > 0.45) {
+            if (inDrain(hp.x, hp.y, hp.z)) done = true;
+            else if (!tgt) { if (!p.foam) spill(p.mix, hp.x, hp.y, hp.z); else foamBlob(hp); done = true; }
+            else if (tgt.kind === 'lump' && [...p.mix.ids()].some((id) => canReact(tgt.sub, id))) { landOnGround(p); done = true; }
+            else { p.x = hp.x + hit.hitNormalWorld.x * 0.02; p.z = hp.z + hit.hitNormalWorld.z * 0.02; p.y = hp.y + 0.004; p.vx += (Math.random() - 0.5) * 0.6; p.vz += (Math.random() - 0.5) * 0.6; p.vy = 0.2; p.life = Math.min(p.life, 0.6); }
+          } else { p.x = hp.x + hit.hitNormalWorld.x * 0.006; p.y = hp.y; p.z = hp.z + hit.hitNormalWorld.z * 0.006; p.vx *= 0.1; p.vz *= 0.1; }
+        }
+      }
+      if (done) { if (p.life <= 0 && !p.foam) landOnGround(p); parcels.splice(i, 1); continue; }
+      if (n < MAXP) { dm.position.set(p.x, p.y, p.z); const st = 1 + Math.min(1.5, Math.abs(p.vy) * 0.25); dm.scale.set(p.r, p.r * st, p.r); dm.updateMatrix(); parcelMesh.setMatrixAt(n, dm.matrix); parcelMesh.setColorAt(n, pc.set(p.color)); n++; }
+    }
+    parcelMesh.count = n;
+    parcelMesh.instanceMatrix.needsUpdate = true;
+    if (parcelMesh.instanceColor) parcelMesh.instanceColor.needsUpdate = true;
+  }
+  function foamBlob(hp) { G.P.emit({ pos: V(hp.x, hp.y + 0.01, hp.z), vel: V(0, 0.02, 0), life: 3 + Math.random() * 2, size: 0.05, size1: 0.02, color: 0xffffff, alpha: 0.85, tex: 'smoke' }); }
+
+  // ---------- puddles and piles ----------
+  function spill(mix, x, y, z) {
+    if (mix.isEmpty()) return null;
+    if (inDrain(x, y, z)) return null;
+    let pd = null;
+    for (const q of puddles) if (Math.abs(q.y - y) < 0.03 && Math.hypot(q.x - x, q.z - z) < q.r + 0.05) { pd = q; break; }
+    if (!pd) {
+      if (puddles.length >= 36) { const old = puddles.shift(); disposePuddle(old); }
+      const disc = new THREE.Mesh(discGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, transparent: true, opacity: 0.5, depthWrite: false, envMapIntensity: 1.8, polygonOffset: true, polygonOffsetFactor: -2 }));
+      const pile = new THREE.Mesh(coneGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 })); pile.castShadow = true;
+      disc.renderOrder = 1; disc.receiveShadow = true;
+      scene.add(disc, pile);
+      const pieces = [];
+      for (let i = 0; i < 4; i++) { const m = new THREE.Mesh(pieceGeo, pieceMat('iron')); m.visible = false; m.castShadow = true; scene.add(m); pieces.push(m); }
+      pd = { kind: 'puddle', id: nextId++, x, y, z, r: 0.01, mix: new Mixture(20), disc, pile, pieces, dirty: true, air: 1, pieceMol: {}, name: 'Spill', skitter: 0, foam: 0 };
+      pd.mix.extraC = 40; // the bit of bench under it
+      puddles.push(pd);
+    }
+    pd.mix.merge(mix); pd.dirty = true; pd.changed = G.time;
+    return pd;
+  }
+  function disposePuddle(pd) { scene.remove(pd.disc, pd.pile); for (const m of pd.pieces) scene.remove(m); pd.dead = true; }
+  function updatePuddle(pd, t) {
+    if (pd.dirty) {
+      pd.dirty = false;
+      pd.an = pd.mix.analyse();
+      const a = pd.an, liq = a.layers.filter((l) => l.key !== 'sed'), sed = a.layers.find((l) => l.key === 'sed');
+      const top = liq.length ? liq[liq.length - 1] : null;
+      const thick = top && top.metal ? 0.0035 : 0.0018;
+      const rl = Math.min(0.7, Math.sqrt(a.liquid * 0.001 / (Math.PI * thick)));
+      pd.disc.visible = !!top && rl > 0.004;
+      if (top) { pd.disc.material.color.set(top.color); pd.disc.material.opacity = Math.min(0.95, top.alpha + 0.2); pd.disc.material.metalness = top.metal ? 1 : 0; pd.disc.material.roughness = top.metal ? 0.12 : 0.05; pd.disc.scale.setScalar(Math.max(rl, 0.001)); pd.disc.position.set(pd.x, pd.y + 0.0016, pd.z); }
+      const rp = sed ? Math.cbrt(3 * sed.vol * 0.001 / (Math.PI * 0.62)) : 0;
+      pd.pile.visible = rp > 0.003;
+      if (sed) { pd.pile.material.color.set(sed.color); pd.pile.scale.set(rp, rp * 0.62, rp); pd.pile.position.set(pd.x, pd.y, pd.z); }
+      pd.r = Math.max(rl, rp, 0.02);
+      if (pd.mix.isEmpty()) { disposePuddle(pd); puddles.splice(puddles.indexOf(pd), 1); return; }
+    }
+    const a = pd.an; if (!a) return;
+    const g = heatGlow(pd.mix.T);
+    if (g) pd.pile.material.emissive.setRGB(g[0] * g[3], g[1] * g[3], g[2] * g[3]); else pd.pile.material.emissive.setRGB(0, 0, 0);
+    let k = 0;
+    for (const c of a.chunks) {
+      if (k >= pd.pieces.length) break;
+      const s = SUB[c.id], r = Math.max(0.005, Math.cbrt(c.mol * s.M / s.density * 1e-6 * 3 / (4 * Math.PI)));
+      const m = pd.pieces[k++]; m.visible = true; m.material = pieceMat(c.id); m.scale.setScalar(r);
+      const sk = pd.skitter > 0 ? 1 : 0, ang = k * 2.1 + (sk ? t * 5 : 0), rad = sk ? pd.r * (0.3 + 0.3 * Math.sin(t * 3.1 + k)) : 0.01 * k;
+      m.position.set(pd.x + Math.cos(ang) * rad, pd.y + r * 0.8, pd.z + Math.sin(ang) * rad);
+    }
+    for (; k < pd.pieces.length; k++) pd.pieces[k].visible = false;
+  }
+
+  // ---------- per-frame: follow the physics, show the contents, pour ----------
+  function sync(it) {
+    const b = it.body;
+    if (it.kind === 'vessel') {
+      b.quaternion.vmult(cq.set(0, 1, 0), cv);
+      it.up.set(cv.x, cv.y, cv.z);
+      it.base.set(b.position.x - cv.x * it.halfH, b.position.y - cv.y * it.halfH, b.position.z - cv.z * it.halfH);
+      it.group.position.copy(it.base);
+    } else it.group.position.set(b.position.x, b.position.y, b.position.z);
+    it.group.quaternion.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
+  }
+  function updateVessel(it, dt, t) {
+    const d = it.def, mix = it.mix;
+    if (it.dirty) {
+      it.dirty = false;
+      it.an = mix.analyse();
+      const m = d.mass + mix.massG() / 1000;
+      if (Math.abs(m - it.body.mass) > 0.004 + it.body.mass * 0.02) { it.body.mass = m; it.body.updateMassProperties(); }
+    }
+    const a = it.an, up = it.up, base = it.base;
+    it.foam = Math.max(0, it.foam - it.foam * dt * 0.12);
+    it.skitter = Math.max(0, it.skitter - dt);
+    const total = a.total + it.foam;
+    const yw = (h) => base.y + up.y * h;
+    // liquid layers, each clipped between two horizontal planes so the surface stays level when you tilt
+    let cum = 0, k = 0, hPrev = d.inner[0][1] - 0.002, topH = hPrev, topLayer = null;
+    const list = it.foam > 0.0005 ? [...a.layers, { key: 'foam', vol: it.foam, color: '#ffffff', alpha: 0.92 }] : a.layers;
+    for (const l of list) {
+      if (k >= it.layers.length) break;
+      cum += l.vol;
+      const h = cum >= d.cap ? d.H + 0.04 : d.heightFor(cum), L = it.layers[k++];
+      L.m.visible = true;
+      L.top.constant = yw(Math.min(h, d.H + (l.key === 'foam' ? 0.04 : 0)));
+      L.bot.constant = -yw(hPrev) + 0.0004;
+      const opaque = l.grain || l.metal || l.alpha >= 0.94;
+      if (L.mat.transparent === opaque) { L.mat.transparent = !opaque; L.mat.depthWrite = opaque; L.mat.needsUpdate = true; }
+      L.mat.color.set(l.color); L.mat.opacity = opaque ? 1 : Math.min(0.92, l.alpha + 0.12);
+      L.mat.metalness = l.metal ? 1 : 0; L.mat.roughness = l.metal ? 0.1 : l.grain ? 0.9 : 0.12;
+      const g = heatGlow(mix.T);
+      if (g && (l.grain || l.key.startsWith('melt'))) L.mat.emissive.setRGB(g[0] * g[3], g[1] * g[3], g[2] * g[3]); else L.mat.emissive.setRGB(0, 0, 0);
+      hPrev = Math.min(h, d.H); topH = hPrev;
+      if (l.key !== 'sed') topLayer = l;
+      l.h = hPrev;
+    }
+    for (; k < it.layers.length; k++) it.layers[k].m.visible = false;
+    const s = it.surface;
+    s.visible = !!topLayer && up.y > 0.93 && topH < d.H - 0.001;
+    if (s.visible) { s.position.set(base.x + up.x * topH, yw(topH) - 0.0004, base.z + up.z * topH); s.scale.setScalar(d.rAt(topH) * 0.965); s.material.color.set(topLayer.color); s.material.opacity = Math.min(0.95, topLayer.alpha + 0.3); s.material.metalness = topLayer.metal ? 1 : 0; }
+    // lumps sitting in or floating on the contents
+    let pi = 0;
+    for (const c of a.chunks) {
+      const sub = SUB[c.id], per = it.pieceMol[c.id] || c.mol, count = Math.max(1, Math.min(3, Math.round(c.mol / per)));
+      const r = Math.max(0.004, Math.cbrt((c.mol / count) * sub.M / sub.density * 1e-6 * 3 / (4 * Math.PI)));
+      const fl = c.floatOn ? list.find((l) => l.key === c.floatOn) : null;
+      for (let j = 0; j < count && pi < it.pieces.length; j++) {
+        const m = it.pieces[pi++]; m.visible = true; m.material = pieceMat(c.id); m.scale.setScalar(c.molten ? r * 1.05 : r);
+        const hh = fl ? fl.h : d.inner[0][1] + r * 0.8, lim = Math.max(0.001, d.rAt(hh) - r - 0.002);
+        const sk = it.skitter > 0 && fl ? 1 : 0;
+        const ang = pi * 2.3 + it.id + (sk ? t * 6.5 * (1 + 0.3 * Math.sin(t * 1.7)) : 0), rad = Math.min(lim, sk ? lim * (0.45 + 0.5 * Math.sin(t * 4.3 + pi)) : 0.009 * (pi - 1) + 0.004);
+        t1.set(Math.cos(ang) * rad, hh, Math.sin(ang) * rad).applyQuaternion(it.group.quaternion).add(base);
+        if (fl) t1.y = yw(fl.h) - r * 0.25 + (sk ? Math.sin(t * 30 + pi) * 0.0015 : 0);
+        m.position.copy(t1);
+        m.rotation.set(t * sk * 3, pi, t * sk * 2);
+      }
+    }
+    for (; pi < it.pieces.length; pi++) it.pieces[pi].visible = false;
+
+    // pouring: liquid leaves when its surface is above the lowest point of the rim
+    it.flowing = 0;
+    const awake = it.held || it.body.sleepState !== 2;
+    if (!awake && total <= d.cap) return;
+    const tilt = Math.acos(Math.max(-1, Math.min(1, up.y)));
+    if (total <= 1e-6 || (tilt < 0.06 && total <= d.cap)) { dumpChunks(it, tilt, dt); return; }
+    const over = Math.max(0, total - d.cap);
+    const hFill = d.heightFor(Math.min(total, d.cap));
+    const sinT = Math.sin(tilt), rimLowY = yw(d.H) - d.rimR * sinT;
+    let head = yw(hFill) - rimLowY + over * 0.4;
+    const dry = a.liquid < 1e-5 && it.foam < 1e-4;
+    if (dry && tilt < 0.62) head = 0;
+    if (head > 0.0003) {
+      const w = Math.min(d.spout, d.rimR * 1.2);
+      const visc = a.top && a.top.key === 'org' ? 7 : 1;
+      let q = 0.6 * w * Math.sqrt(2 * G9) * Math.pow(head, 1.5) * 1000 / visc; // litres per second
+      if (dry) q *= 0.5;
+      q = Math.min(q, total / 0.2, 0.25);
+      it.pourAcc += q * dt; it.pourT += dt; it.flowing = q;
+      if (it.pourAcc >= 0.0007 || it.pourT > 0.05) {
+        const hx = up.x, hz = up.z, hl = Math.hypot(hx, hz) || 1;
+        const nx = hl > 0.02 ? hx / hl : Math.cos(it.id), nz = hl > 0.02 ? hz / hl : Math.sin(it.id);
+        t2.set(base.x + up.x * d.H + nx * (d.rimR + 0.003), yw(d.H) - d.rimR * sinT + 0.002, base.z + up.z * d.H + nz * (d.rimR + 0.003));
+        const vo = Math.sqrt(2 * G9 * head) * 0.7 + 0.12, bv = it.body.velocity;
+        t3.set(nx * vo + bv.x, bv.y - 0.05, nz * vo + bv.z);
+        let vol = it.pourAcc; it.pourAcc = 0; it.pourT = 0;
+        if (it.foam > 0.0005 && (over > 0 || a.total < 1e-5)) { const f = Math.min(it.foam, vol); it.foam -= f; emitParcel(mix.takeVolume(f * 0.08), t2, t3, { color: '#ffffff', foam: a.total < 1e-5, src: it }); vol -= f; }
+        if (vol > 1e-6 && a.total > 1e-6) { emitParcel(mix.takeVolume(vol), t2, t3, { src: it }); }
+        it.dirty = true; it.changed = G.time;
+      }
+    }
+    dumpChunks(it, tilt, dt);
+  }
+  function dumpChunks(it, tilt, dt) {
+    if (tilt < 1.75 || !it.an.chunks.length) return;
+    it.dumpT = (it.dumpT || 0) + dt;
+    if (it.dumpT < 0.12) return;
+    it.dumpT = 0;
+    const c = it.an.chunks[0];
+    const l = takeChunk(it, c.id);
+    if (l) { l.body.velocity.set(it.up.x * 0.6, -0.3, it.up.z * 0.6); }
+  }
+  // pull one lump out of a container (tongs) or let it fall out
+  function takeChunk(it, id) {
+    id = id || it.mix.firstChunk();
+    if (!id) return null;
+    const mol = Math.min(it.pieceMol[id] || it.mix.n[id], it.mix.n[id]);
+    const part = it.mix.takeChunk(id, mol);
+    const l = makeLump(id, part.n[id], { shape: it.pieceShape[id], T: it.mix.T, surf: part.surf[id] });
+    l.body.position.set(it.base.x + it.up.x * (it.def.H + 0.03), it.base.y + it.up.y * (it.def.H + 0.03), it.base.z + it.up.z * (it.def.H + 0.03));
+    it.dirty = true; it.changed = G.time;
+    return l;
+  }
+  function updateLump(it) {
+    const g = heatGlow(it.mix.T);
+    if (g) it.mat.emissive.setRGB(g[0] * g[3], g[1] * g[3], g[2] * g[3]); else if (it.mat.emissive.r > 0) it.mat.emissive.setRGB(0, 0, 0);
+    if (it.dirty) { // colour follows what the lump is now made of
+      it.dirty = false;
+      const dom = it.mix.dominant();
+      if (dom && dom !== it.shown) { it.shown = dom; const s = SUB[dom]; it.mat.color.set(s.color); it.mat.metalness = s.look === 'metal' ? 1 : 0.02; it.mat.roughness = s.look === 'metal' ? 0.36 : 0.92; if (dom !== it.sub) it.name = s.name + ' (was ' + SUB[it.sub].name.toLowerCase() + ')'; }
+      const m = it.mix.massG() / 1000;
+      if (m > 1e-5 && Math.abs(m - it.body.mass) > it.body.mass * 0.05) { it.body.mass = m; it.body.updateMassProperties(); }
+    }
+  }
+  // loose lumps drop into containers they fall into, and join spills they can react with
+  function absorb() {
+    for (const l of items) {
+      if (l.kind !== 'lump' || l.held || !l.small) continue;
+      const lp = l.body.position;
+      let done = false;
+      for (const it of items) {
+        if (it.kind !== 'vessel' || it.up.y < 0.55) continue;
+        const b = it.body.position;
+        if (Math.abs(lp.x - b.x) > 0.08 || Math.abs(lp.z - b.z) > 0.08 || Math.abs(lp.y - b.y) > 0.16) continue;
+        cv.set(lp.x, lp.y, lp.z); it.body.pointToLocalFrame(cv, cv2);
+        const hb = cv2.y + it.halfH, rad = Math.hypot(cv2.x, cv2.z);
+        if (hb > 0 && hb < it.def.H + 0.012 && rad < it.def.rimR + 0.002) {
+          for (const id of l.mix.ids()) { it.mix.add(id, l.mix.n[id], l.mix.T, l.mix.surfOf(id)); it.pieceMol[id] = l.mix.n[id]; it.pieceShape[id] = l.shape; }
+          for (const k in l.mix.burning) it.mix.burning[k] = true;
+          it.dirty = true; it.changed = G.time;
+          play(it.an && it.an.liquid > 0.005 ? 'plop' : 'clink', b, 0.6);
+          remove(l); done = true; break;
+        }
+      }
+      if (done) continue;
+      for (const pd of puddles) {
+        if (Math.abs(lp.y - pd.y) > 0.05 || Math.hypot(lp.x - pd.x, lp.z - pd.z) > pd.r + 0.01) continue;
+        if (!pd.mix.ids().some((id) => canReact(l.sub, id))) continue;
+        for (const id of l.mix.ids()) { pd.mix.add(id, l.mix.n[id], l.mix.T, l.mix.surfOf(id)); pd.pieceMol[id] = l.mix.n[id]; }
+        pd.dirty = true; pd.changed = G.time; remove(l); break;
+      }
+    }
+  }
+
+  function update(dt, t) {
+    while (breakQueue.length) shatter(breakQueue.pop());
+    for (const it of items) {
+      sync(it);
+      if (it.kind === 'vessel') updateVessel(it, dt, t);
+      else if (it.kind === 'lump') updateLump(it);
+      if (it.body.position.y < -3) remove(it);
+    }
+    absorb();
+    updateParcels(dt);
+    for (let i = puddles.length - 1; i >= 0; i--) updatePuddle(puddles[i], t);
+    for (let i = shards.length - 1; i >= 0; i--) {
+      const s = shards[i]; s.life -= dt;
+      s.m.position.set(s.b.position.x, s.b.position.y, s.b.position.z); s.m.quaternion.set(s.b.quaternion.x, s.b.quaternion.y, s.b.quaternion.z, s.b.quaternion.w);
+      if (s.life <= 0) { scene.remove(s.m); phys.world.removeBody(s.b); shards.splice(i, 1); }
+    }
+  }
+  function clearAll() {
+    for (const it of [...items]) remove(it);
+    for (const pd of puddles) disposePuddle(pd); puddles.length = 0;
+    parcels.length = 0; parcelMesh.count = 0;
+    for (const s of shards) { scene.remove(s.m); phys.world.removeBody(s.b); } shards.length = 0;
+  }
+  // world position where a holder's contents meet the air (for flames, fumes, bubbles)
+  function topOf(h, out = V()) {
+    if (h.kind === 'vessel') { const y = h.an && h.an.total > 0 ? Math.min(h.def.H, h.def.heightFor(Math.min(h.an.total + h.foam, h.def.cap))) : h.def.inner[0][1]; return out.set(h.base.x + h.up.x * y, h.base.y + h.up.y * y, h.base.z + h.up.z * y); }
+    if (h.kind === 'puddle') return out.set(h.x, h.y + 0.01, h.z);
+    return out.set(h.body.position.x, h.body.position.y, h.body.position.z);
+  }
+  function posOf(h, out = V()) {
+    if (h.kind === 'puddle') return out.set(h.x, h.y, h.z);
+    if (h.kind === 'vessel') return out.copy(h.base);
+    return out.set(h.body.position.x, h.body.position.y, h.body.position.z);
+  }
+
+  return { items, puddles, parcels, makeVessel, makeLump, makeProp, fill, place, remove, shatter, spillAll, spill, emitParcel, takeChunk, update, clearAll, topOf, posOf, sync, M };
+}

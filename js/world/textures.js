@@ -42,8 +42,8 @@ export function floorTex(rx, ry) {
 export function wallTex(rx, ry) {
   const [c, g] = cv(512, 512);
   g.fillStyle = '#d9dcd8'; g.fillRect(0, 0, 512, 512);
-  speckle(g, 512, 512, 9000, 0.05);
-  stains(g, 512, 512, 8, 'rgba(90,84,70,.05)', 120);
+  speckle(g, 512, 512, 9000, 0.035);
+  stains(g, 512, 512, 5, 'rgba(90,84,70,.022)', 140);
   return tex(c, rx, ry);
 }
 export function tileTex(rx, ry) {

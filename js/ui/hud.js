@@ -114,7 +114,7 @@ export function createHud(G) {
     if (bannerT > 0) { bannerT -= dt; if (bannerT <= 0) $('banner').hidden = true; }
     else if (queue.length) showBanner(queue.shift());
     // looking at burning magnesium whites out your view, then fades as your eyes recover
-    const g = glare * (G.settings.flash ? 1 : 0.3);
+    const g = Math.min(0.78, glare) * (G.settings.flash ? 1 : 0.3);
     glareNow = g > glareNow ? g : Math.max(0, glareNow - dt * 0.45);
     const fl = $('fxFlash');
     if (glareNow > 0.02 && !fl.style.transition.includes('opacity 0.') ) { fl.style.transition = 'none'; fl.style.opacity = Math.min(0.92, glareNow); }
@@ -154,7 +154,7 @@ export function createHud(G) {
          <dl><dt>Number</dt><dd>${e.z}</dd><dt>Mass</dt><dd>${e.mass} u</dd><dt>At 20 °C</dt><dd>${esc(e.state || 'unknown')}</dd><dt>Melts</dt><dd>${val(e.mp, '°C')}</dd><dt>Boils</dt><dd>${val(e.bp, '°C')}</dd>
          <dt>Density</dt><dd>${val(e.density, e.state === 'gas' ? 'g/L' : 'g/cm³')}</dd><dt>Family</dt><dd>${esc(e.block)}</dd><dt>Known since</dt><dd>${esc(e.year || 'unknown')}</dd>
          ${e.flame ? `<dt>Flame</dt><dd><span class="swatch" style="background:${e.flame}"></span>${e.flame}</dd>` : ''}</dl>
-         ${s && s.fact ? `<p>${esc(s.fact)}</p>` : ''}<p style="color:var(--mute)">${s ? 'On the storage shelves now.' : 'Unlocked, but its samples arrive in a later build.'}</p>`
+         ${s && s.fact ? `<p>${esc(s.fact)}</p>` : ''}<p style="color:var(--mute)">${G.stocked && G.stocked.has(e.sym) ? 'On the storage shelves now.' : e.state === 'gas' ? 'Unlocked. Its gas cylinder arrives with the gas-handling update.' : 'Unlocked, but its samples arrive in a later build.'}</p>`
       : `<div class="big" style="color:#3a464c">${e.sym}</div><h3 style="color:var(--mute)">Locked</h3><span class="tier">Tier ${e.tier} · number ${e.z}</span><p>${esc(e.hint)}</p>
          <p style="color:var(--mute)">Earned by finding a source, processing it and verifying the sample. The rooms for that arrive in later builds.</p>`;
   }

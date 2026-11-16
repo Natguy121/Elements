@@ -231,7 +231,7 @@ export function createSim(G) {
         if (fx.glare && fx.glare.t > 0) {
           const dx = top.x - cam.x, dy = top.y - cam.y, dz = top.z - cam.z, d = Math.hypot(dx, dy, dz) || 1;
           const facing = Math.max(0, (dx * dir.x + dy * dir.y + dz * dir.z) / d);
-          glare = Math.max(glare, fx.glare.power * Math.pow(facing, 6) * Math.min(1, 2.2 / (d * d + 0.3)));
+          glare = Math.max(glare, fx.glare.power * Math.pow(facing, 8) * Math.min(1, 0.7 / (d * d + 0.15)));
         }
       }
     }

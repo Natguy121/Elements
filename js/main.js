@@ -140,15 +140,15 @@ function boot() {
   // ---------- first-person arms and tools ----------
   const view = (() => {
     const g = new THREE.Group(); camera.add(g);
-    const coat = new THREE.MeshStandardMaterial({ color: 0xe8ebea, roughness: 0.85 }), glove = new THREE.MeshStandardMaterial({ color: 0x3a6fb8, roughness: 0.55 });
+    const coat = new THREE.MeshStandardMaterial({ color: 0x6c7479, roughness: 1, envMapIntensity: 0.1 }), glove = new THREE.MeshStandardMaterial({ color: 0x2f5f9e, roughness: 0.5, envMapIntensity: 0.5 });
     const steel = new THREE.MeshStandardMaterial({ color: 0xc8ccd0, metalness: 1, roughness: 0.3 });
     const arm = (side) => {
       const a = new THREE.Group();
-      const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.031, 0.044, 1, 10), coat); sleeve.position.y = 0.5; a.add(sleeve);
-      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.036, 12, 10), glove); hand.scale.set(1, 1.25, 0.8); a.add(hand);
-      const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.034, 0.03, 10), glove); cuff.position.y = 0.02; a.add(cuff);
+      const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.034, 1, 10), coat); sleeve.position.y = 0.5; a.add(sleeve);
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 10), glove); hand.scale.set(1, 1.25, 0.8); a.add(hand);
+      const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.027, 0.027, 0.03, 10), glove); cuff.position.y = 0.02; a.add(cuff);
       g.add(a);
-      return { a, sleeve, hand, side, shoulder: V(side * 0.32, -0.42, 0.1), rest: V(side * 0.29, -0.4, -0.28), cur: V(side * 0.29, -0.4, -0.28) };
+      return { a, sleeve, hand, side, shoulder: V(side * 0.3, -0.62, 0.05), rest: V(side * 0.26, -0.36, -0.3), cur: V(side * 0.26, -0.36, -0.3) };
     };
     const R = arm(1), L = arm(-1);
     const tools = {};
@@ -182,12 +182,12 @@ function boot() {
           const b = h.item.body; b.pointToWorldFrame(h.local, cvv);
           inv.copy(camera.matrixWorld).invert();
           tp.set(cvv.x, cvv.y, cvv.z).applyMatrix4(inv);
-          const dist = tp.length(), reach = 0.62;
+          const dist = tp.length(), reach = 0.5;
           const hp = tp.clone(); if (dist > reach) hp.multiplyScalar(reach / dist);
           const shake = strain > 0.7 ? (strain - 0.7) * 0.03 : 0;
           hp.x += Math.sin(t * 37) * shake; hp.y += Math.cos(t * 31) * shake;
           if (h.tool === 'tongs') { rt = V(0.16, -0.2, -0.38); const dd = tp.clone().sub(rt); tools.tongs.scale.set(1, dd.length(), 1); q.setFromUnitVectors(V(0, -1, 0), dd.normalize()); }
-          else { rt = hp.clone().add(V(0.05, -0.02, 0.04)); if (b.mass > 2.5 || h.item.pickR > 0.15) lt = hp.clone().add(V(-0.07, -0.02, 0.04)); showT = dist > reach + 0.12; if (showT) { const p = tether.geometry.attributes.position; p.setXYZ(0, rt.x, rt.y, rt.z); p.setXYZ(1, tp.x, tp.y, tp.z); p.needsUpdate = true; } }
+          else { rt = hp.clone().add(V(0.06, -0.07, 0.05)); rt.y = Math.min(rt.y, -0.12); if (b.mass > 2.5 || h.item.pickR > 0.15) lt = hp.clone().add(V(-0.07, -0.02, 0.04)); showT = dist > reach + 0.12; if (showT) { const p = tether.geometry.attributes.position; p.setXYZ(0, rt.x, rt.y, rt.z); p.setXYZ(1, tp.x, tp.y, tp.z); p.needsUpdate = true; } }
         } else if (current === 'tongs') tools.tongs.scale.set(1, 0.26, 1);
         tether.visible = showT;
         aim(R, rt, dt); aim(L, lt, dt);

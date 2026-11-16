@@ -269,6 +269,7 @@ export function buildLab(G) {
   const mat = () => G.matter;
   function supplyJar(type, sub, mol, x, y, z, o = {}) {
     const s = SUB[sub];
+    if (s.el) G.stocked.add(s.el);
     const it = mat().makeVessel(type, { label: o.label || s.name, formula: o.formula ?? s.formula, tags: [...(s.tags || [])], accent: o.accent, glass: o.glass });
     mat().fill(it, sub, mol, o.surf, o.pieceMol, o.shape);
     if (o.extra) for (const [id, m] of o.extra) mat().fill(it, id, m);
@@ -278,6 +279,7 @@ export function buildLab(G) {
   }
   function populate() {
     const m = mat();
+    G.stocked = new Set(['Si', 'Au']);
     // glassware on the first island
     const A = BENCH;
     [[-3.25, -0.3], [-2.95, -0.3], [-2.65, -0.3], [-2.35, -0.3]].forEach(([x, z]) => m.place(m.makeVessel('beaker250'), x, A, z));

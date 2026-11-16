@@ -27,7 +27,8 @@ export function createMatter(G) {
 
   // ---------- shared materials ----------
   const M = {
-    glass: new THREE.MeshPhysicalMaterial({ color: 0xeaf6f8, roughness: 0.03, metalness: 0, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false, envMapIntensity: 2.2, clearcoat: 1, clearcoatRoughness: 0.05 }),
+    // borosilicate glass: mostly see-through, slightly green-grey at the edges, sharp highlights
+    glass: new THREE.MeshPhysicalMaterial({ color: 0xdbe8e6, roughness: 0.02, metalness: 0, transparent: true, opacity: 0.1, side: THREE.DoubleSide, depthWrite: false, envMapIntensity: 1.3, specularIntensity: 1, ior: 1.47 }),
     amber: new THREE.MeshPhysicalMaterial({ color: 0x7a3d10, roughness: 0.05, transparent: true, opacity: 0.62, side: THREE.DoubleSide, depthWrite: false, envMapIntensity: 1.8, clearcoat: 1 }),
     ceramic: new THREE.MeshStandardMaterial({ color: 0xeeebe2, roughness: 0.35, side: THREE.DoubleSide }),
     shard: new THREE.MeshPhysicalMaterial({ color: 0xdff2f5, roughness: 0.05, transparent: true, opacity: 0.4, envMapIntensity: 2.2, side: THREE.DoubleSide }),
@@ -38,6 +39,20 @@ export function createMatter(G) {
     brass: new THREE.MeshStandardMaterial({ color: 0xcfa640, metalness: 1, roughness: 0.3 }),
     black: new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.5 }),
   };
+  // Glass is see-through face-on and reflective toward its edges (Fresnel). Doing this in the shader
+  // stops empty glassware reading as frosted grey cups against the dark bench.
+  function fresnelGlass(mat, faceAlpha, edgeAlpha) {
+    mat.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', `#include <opaque_fragment>
+        float fresK = 1.0 - abs(dot(normalize(normal), normalize(vViewPosition)));
+        gl_FragColor.a = clamp(mix(${faceAlpha.toFixed(3)}, ${edgeAlpha.toFixed(3)}, fresK * fresK * fresK), 0.0, 1.0);`);
+    };
+    mat.customProgramCacheKey = () => 'fresnel' + faceAlpha + edgeAlpha;
+    return mat;
+  }
+  fresnelGlass(M.glass, 0.035, 0.75);
+  fresnelGlass(M.amber, 0.5, 0.9);
+  fresnelGlass(M.shard, 0.15, 0.8);
   const geoCache = {};
   function vesselGeo(type) {
     if (geoCache[type]) return geoCache[type];
@@ -47,6 +62,7 @@ export function createMatter(G) {
     const rim = new THREE.TorusGeometry(d.prof[d.prof.length - 1][0], 0.0016, 6, 30);
     return (geoCache[type] = { outer, inner, rim });
   }
+  const DARK = new THREE.Color(0x0b0f12);
   const discGeo = new THREE.CircleGeometry(1, 28); discGeo.rotateX(-Math.PI / 2);
   const coneGeo = new THREE.ConeGeometry(1, 1, 22); coneGeo.translate(0, 0.5, 0);
   const pieceGeo = new THREE.IcosahedronGeometry(1, 1);
@@ -308,7 +324,14 @@ export function createMatter(G) {
         }
       }
       if (done) { if (p.life <= 0 && !p.foam) landOnGround(p); parcels.splice(i, 1); continue; }
-      if (n < MAXP) { dm.position.set(p.x, p.y, p.z); const st = 1 + Math.min(1.5, Math.abs(p.vy) * 0.25); dm.scale.set(p.r, p.r * st, p.r); dm.updateMatrix(); parcelMesh.setMatrixAt(n, dm.matrix); parcelMesh.setColorAt(n, pc.set(p.color)); n++; }
+      if (n < MAXP) {
+        // each drop is stretched along its path so consecutive drops merge into a stream
+        const sp = Math.hypot(p.vx, p.vy, p.vz);
+        dm.position.set(p.x, p.y, p.z);
+        if (sp > 0.05) { t1.set(p.vx / sp, p.vy / sp, p.vz / sp); dm.quaternion.setFromUnitVectors(UP, t1); } else dm.quaternion.identity();
+        dm.scale.set(p.r * 0.85, p.r * (1.2 + Math.min(4, sp * 2.6)), p.r * 0.85);
+        dm.updateMatrix(); parcelMesh.setMatrixAt(n, dm.matrix); parcelMesh.setColorAt(n, pc.set(p.color)); n++;
+      }
     }
     parcelMesh.count = n;
     parcelMesh.instanceMatrix.needsUpdate = true;
@@ -347,7 +370,8 @@ export function createMatter(G) {
       const thick = top && top.metal ? 0.0035 : 0.0018;
       const rl = Math.min(0.7, Math.sqrt(a.liquid * 0.001 / (Math.PI * thick)));
       pd.disc.visible = !!top && rl > 0.004;
-      if (top) { pd.disc.material.color.set(top.color); pd.disc.material.opacity = Math.min(0.95, top.alpha + 0.2); pd.disc.material.metalness = top.metal ? 1 : 0; pd.disc.material.roughness = top.metal ? 0.12 : 0.05; pd.disc.scale.setScalar(Math.max(rl, 0.001)); pd.disc.position.set(pd.x, pd.y + 0.0016, pd.z); }
+      // clear liquids read as a dark wet sheen on the bench, coloured or cloudy ones show their colour
+      if (top) { const clear = !top.metal && top.alpha < 0.5 && !(top.cloud > 0.2); pd.disc.material.color.set(top.color); if (clear) pd.disc.material.color.lerp(DARK, 0.72); pd.disc.material.opacity = clear ? 0.42 : Math.min(0.95, top.alpha + 0.2); pd.disc.material.metalness = top.metal ? 1 : 0; pd.disc.material.roughness = top.metal ? 0.12 : 0.03; pd.disc.scale.setScalar(Math.max(rl, 0.001)); pd.disc.position.set(pd.x, pd.y + 0.0016, pd.z); }
       const rp = sed ? Math.cbrt(3 * sed.vol * 0.001 / (Math.PI * 0.62)) : 0;
       pd.pile.visible = rp > 0.003;
       if (sed) { pd.pile.material.color.set(sed.color); pd.pile.scale.set(rp, rp * 0.62, rp); pd.pile.position.set(pd.x, pd.y, pd.z); }

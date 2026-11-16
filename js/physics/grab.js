@@ -12,7 +12,7 @@ export function createGrab(phys, player, camera, hooks) {
   const { CANNON } = phys;
   let h = null; // current hold
   const tq = new THREE.Quaternion(), yawQ = new THREE.Quaternion(), pourQ = new THREE.Quaternion(), bq = new THREE.Quaternion(), qe = new THREE.Quaternion();
-  const right = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0), v3 = new THREE.Vector3();
+  const right = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0), v3 = new THREE.Vector3(), fwdV = new THREE.Vector3();
   const p = new CANNON.Vec3(), r = new CANNON.Vec3(), v = new CANNON.Vec3(), F = new CANNON.Vec3(), tau = new CANNON.Vec3(), w = new CANNON.Vec3();
 
   // Bodies whose collisions with loose objects were switched off. Switching them back on while two
@@ -117,7 +117,15 @@ export function createGrab(phys, player, camera, hooks) {
       right.set(1, 0, 0); qe.setFromAxisAngle(right, input.st.lookY * 0.006); h.user.premultiply(qe);
     }
     v3.copy(player.dir);
-    h.target.copy(player.pos).addScaledVector(v3, h.dist);
+    // the hold point stops in front of benches, walls and the floor, so looking down while carrying a
+    // bottle does not ram it into the bench
+    let dHold = h.dist;
+    { const o = player.pos, reachR = Math.min(h.item.pickR || 0.05, 0.3);
+      const hit = phys.raycast(o.x, o.y, o.z, o.x + v3.x * (h.dist + reachR), o.y + v3.y * (h.dist + reachR), o.z + v3.z * (h.dist + reachR), G_STATIC);
+      if (hit) dHold = Math.max(0.35, Math.min(h.dist, hit.distance - reachR - 0.02)); }
+    h.target.copy(player.pos).addScaledVector(v3, dHold);
+    { const o = h.target, hit = phys.raycast(o.x, o.y + 0.3, o.z, o.x, o.y - 1, o.z, G_STATIC);
+      if (hit) h.target.y = Math.max(h.target.y, hit.hitPointWorld.y + (h.item.halfH || 0.05) + 0.015); }
     // pour where you look: while tipping a container, bring its lip over the thing under the crosshair
     h.aim = null;
     const pouring = h.item.kind === 'vessel' && (h.pour > 0.05 || h.item.flowing > 0) && h.tool === 'hand';
@@ -130,7 +138,7 @@ export function createGrab(phys, player, camera, hooks) {
       if (hit && hit.body !== b) {
         const t = hit.body.item;
         const ap = t && t.kind === 'vessel' ? { x: t.base.x + t.up.x * t.def.H, y: t.base.y + t.up.y * t.def.H, z: t.base.z + t.up.z * t.def.H } : hit.hitPointWorld;
-        const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), rise = 0.11;
+        const fx = -Math.cos(player.yaw), fz = Math.sin(player.yaw), rise = 0.11; // the direction it pours: to your left
         const lead = (h.item.exitV || 0.15) * Math.sqrt(2 * rise / 9.81) * Math.max(0, -Math.min(0, h.item.up.y) + 0.6);
         h.aim = true;
         // while it is still mostly upright its base hangs below the mouth, so keep it high until tipped
@@ -149,8 +157,9 @@ export function createGrab(phys, player, camera, hooks) {
     if (h.prevT) { v3.copy(h.target).sub(h.prevT).multiplyScalar(1 / Math.max(dt, 0.001)); if (h.pour > 0.05) v3.set(0, 0, 0); h.tVel.lerp(v3, Math.min(1, dt * 12)); }
     else h.prevT = new THREE.Vector3();
     h.prevT.copy(h.target);
-    right.set(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
-    pourQ.setFromAxisAngle(right, -h.pour);
+    // tip it to the left, the way you pour from the side: the stream and the receiver stay in view
+    fwdV.set(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+    pourQ.setFromAxisAngle(fwdV, -h.pour);
     tq.copy(pourQ).multiply(yawQ).multiply(h.user).multiply(h.qRel);
     h.tq = h.tq || new THREE.Quaternion(); h.tq.copy(tq);
 

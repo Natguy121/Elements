@@ -292,9 +292,10 @@ export function buildLab(G) {
     supplyJar('jar', 'nahco3', 2.4, 1.0, A, -0.3, { ry: Math.PI });
     supplyJar('bottle', 'water', 26.3, 1.32, A, -0.3, { label: 'Vinegar', formula: 'CH3COOH 5%', extra: [['acetic_acid', 0.415]], ry: Math.PI });
     m.place(m.makeVessel('beaker250'), 1.75, A, -0.25); m.place(m.makeVessel('beaker250'), 2.05, A, -0.25);
-    supplyJar('bottle', 'water', 21.5, 2.5, A, -0.3, { label: 'Hydrogen peroxide', formula: 'H2O2 3%', extra: [['h2o2', 0.36]], glass: 'amber', ry: Math.PI });
+    supplyJar('bottle', 'water', 21.1, 2.5, A, -0.3, { label: 'Hydrogen peroxide', formula: 'H2O2 6%', extra: [['h2o2', 0.72]], glass: 'amber', ry: Math.PI });
     supplyJar('jar', 'yeast', 0.4, 2.85, A, -0.3, { formula: 'catalase', ry: Math.PI });
     supplyJar('dropper', 'indicator', 0.06, 3.2, A, -0.3, { formula: 'pH 1-14', ry: Math.PI });
+    supplyJar('bottle', 'soap', 1.4, 3.3, A, 0.3, { formula: 'surfactant' });
     supplyJar('dropper', 'dye_blue', 0.03, 3.36, A, -0.18, { formula: '', ry: Math.PI });
     supplyJar('jar', 'sucrose', 0.6, 1.0, A, 0.3);
     supplyJar('jar', 'nacl', 3.4, 1.34, A, 0.3);

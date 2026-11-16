@@ -55,7 +55,7 @@ npm run build                    # writes dist/reaction-lab.html
 
 Unit tests check every reaction for atom and mass balance.
 
-22 reactions are included, among them:
+22 reactions are included. Foaming reactions push foam out of the container as a rising column that topples into mounds on the bench; add dish soap for the full eruption. They include:
 - baking soda and vinegar
 - sodium, potassium, lithium and calcium in water
 - elephant toothpaste

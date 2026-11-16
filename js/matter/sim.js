@@ -143,7 +143,14 @@ export function createSim(G) {
             if (liquid) bubbles(h, Math.ceil(strength * 3 * f.amount), 1);
             break;
           case 'foam':
-            if (h.kind === 'vessel') { let gas = 0; for (const id in e.emit) gas += e.emit[id]; h.foam = Math.min(h.def.cap * 1.6, h.foam + gas * 24.5 * 0.22 * f.amount); }
+            {
+              // gas released into the liquid becomes foam; soap traps nearly all of it (litres at room temperature)
+              let gas = 0; for (const id in e.emit) gas += e.emit[id];
+              const soapy = h.mix.ids().some((id) => SUB[id].surfactant);
+              const L = gas * 24.5 * f.amount * (soapy ? 0.9 : 0.45);
+              if (h.kind === 'vessel') { h.foam += L; h.soapy = soapy; }
+              else if (h.kind === 'puddle') G.matter.foamAt(h.x, h.y, h.z, L, soapy, h.mix);
+            }
             break;
           case 'skitter': h.skitter = 0.4; break;
           case 'flame': h.fx.flame = { color: f.color, size: f.size * (0.6 + 0.4 * strength) * (h.kind === 'lump' ? Math.min(1.6, 0.5 + h.pickR * 28) : 1), t: 0.25 }; levels.flame = Math.max(levels.flame, 0.3 * f.size * G.dist(top)); break;

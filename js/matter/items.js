@@ -339,6 +339,94 @@ export function createMatter(G) {
   }
   function foamBlob(hp) { G.P.emit({ pos: V(hp.x, hp.y + 0.01, hp.z), vel: V(0, 0.02, 0), life: 3 + Math.random() * 2, size: 0.05, size1: 0.02, color: 0xffffff, alpha: 0.85, tex: 'smoke' }); }
 
+  // ---------- foam: a column climbing out of the mouth, and mounds where it falls ----------
+  // lumpy shapes so foam looks like foam, not like a smooth plastic cylinder
+  const foamColGeo = (() => {
+    const pts = [];
+    for (let i = 0; i <= 14; i++) { const t = i / 14; pts.push(new THREE.Vector2(t < 0.82 ? 1 + 0.05 * Math.sin(t * 19) : Math.sqrt(Math.max(0, 1 - Math.pow((t - 0.82) / 0.18, 2))) * 1.02 + 0.001, t)); }
+    const g = new THREE.LatheGeometry(pts, 22), pa = g.attributes.position;
+    for (let i = 0; i < pa.count; i++) { const x = pa.getX(i), y = pa.getY(i), z = pa.getZ(i), n = 1 + 0.09 * Math.sin(x * 23 + y * 31) * Math.cos(z * 19 - y * 17); pa.setXYZ(i, x * n, y, z * n); }
+    g.computeVertexNormals();
+    return g;
+  })();
+  const foamMoundGeo = (() => {
+    const g = new THREE.SphereGeometry(1, 26, 12, 0, Math.PI * 2, 0, Math.PI / 2), pa = g.attributes.position;
+    for (let i = 0; i < pa.count; i++) { const x = pa.getX(i), y = pa.getY(i), z = pa.getZ(i), n = 1 + 0.13 * Math.sin(x * 9 + z * 7) * Math.cos(z * 11 - x * 5) + 0.06 * Math.sin(y * 21 + x * 13); pa.setXYZ(i, x * n, y * n, z * n); }
+    g.computeVertexNormals();
+    return g;
+  })();
+  // matte and a touch below pure white, so it reads as foam under the lamps instead of glowing
+  const foamMat = (color) => new THREE.MeshStandardMaterial({ color: new THREE.Color(color).multiplyScalar(0.7), roughness: 0.9, metalness: 0, envMapIntensity: 0.3 });
+  const heaps = [];
+  // foam takes the colour of the dye in the liquid it came from, otherwise it is white
+  function foamColor(mix) {
+    if (mix) for (const id in mix.n) { const s = SUB[id]; if (s.tint && s.tint > 50 && !s.surfactant) return new THREE.Color(s.color).lerp(new THREE.Color(0xffffff), 0.35).getHex(); }
+    return 0xf4f2ec;
+  }
+  function foamAt(x, y, z, L, soapy, mix) {
+    if (!(L > 0)) return;
+    let hp = null;
+    for (const q of heaps) if (Math.abs(q.y - y) < 0.05 && Math.hypot(q.x - x, q.z - z) < q.r * 0.7 + 0.03) { hp = q; break; }
+    if (!hp) {
+      if (heaps.length >= 24) { const o = heaps.shift(); scene.remove(o.m); }
+      const m = new THREE.Mesh(foamMoundGeo, foamMat(foamColor(mix))); m.castShadow = true; m.receiveShadow = true; m.rotation.y = Math.random() * 6;
+      scene.add(m);
+      hp = { x, y, z, vol: 0, r: 0, m, decay: soapy ? 0.012 : 0.06, t: 0 };
+      heaps.push(hp);
+    }
+    hp.vol += L; if (soapy) hp.decay = Math.min(hp.decay, 0.012);
+  }
+  function updateHeaps(dt, t) {
+    for (let i = heaps.length - 1; i >= 0; i--) {
+      const q = heaps[i];
+      q.t += dt;
+      q.vol -= q.vol * q.decay * dt; // bubbles burst and it slowly sinks
+      const target = Math.cbrt(q.vol * 0.001 * 3 / (2 * Math.PI * 0.62));
+      q.r += (target - q.r) * Math.min(1, dt * 6);
+      if (q.vol < 0.002 && q.r < 0.008) { scene.remove(q.m); heaps.splice(i, 1); continue; }
+      const breathe = 1 + Math.sin(t * 2.3 + i) * 0.012;
+      q.m.position.set(q.x, q.y + 0.001, q.z); q.m.scale.set(q.r * breathe, q.r * 0.62, q.r * breathe);
+    }
+  }
+  // overflow from one container: the column rises out of the mouth; past its height it topples into a mound
+  function updateFoamColumn(it, dt, t, insideFree) {
+    const d = it.def, up = it.up;
+    const decay = it.soapy ? 0.025 : 0.1;
+    it.foam = Math.max(0, it.foam - it.foam * dt * decay * 0.6);
+    let over = it.foam - insideFree;
+    if (over < 0) over = 0;
+    const mouth = t2.set(it.base.x + up.x * d.H, it.base.y + up.y * d.H, it.base.z + up.z * d.H);
+    if (up.y < 0.5 && it.foam > 0.0005) { // tipped over: foam slides out of the mouth
+      const out = Math.min(it.foam, it.foam * dt * 2.5 + 0.002 * dt);
+      it.foam -= out;
+      const hit = phys.raycast(mouth.x, mouth.y + 0.02, mouth.z, mouth.x, mouth.y - 2, mouth.z, G_STATIC);
+      if (hit) foamAt(hit.hitPointWorld.x, hit.hitPointWorld.y, hit.hitPointWorld.z, out, it.soapy, it.mix);
+      over = 0;
+    }
+    const area = Math.PI * d.rimR * d.rimR * 1.17;
+    const hMax = Math.min(0.3, 0.03 + 0.0035 / Math.max(d.rimR, 0.008)); // narrow necks shoot higher, wide beakers mushroom over
+    let colH = over * 0.001 / area;
+    if (colH > hMax) {
+      // what does not fit in the column flops over the rim and down onto the bench
+      const spillL = (colH - hMax) * area * 1000;
+      it.foam -= spillL; colH = hMax;
+      it.spillA = (it.spillA ?? Math.random() * 6) + dt * 0.7;
+      const rr = d.maxR + 0.03 + Math.min(0.08, spillL * 0.02), sx = mouth.x + Math.cos(it.spillA) * rr, sz = mouth.z + Math.sin(it.spillA) * rr;
+      const hit = phys.raycast(sx, mouth.y, sz, sx, mouth.y - 2, sz, G_STATIC);
+      if (hit) foamAt(hit.hitPointWorld.x, hit.hitPointWorld.y, hit.hitPointWorld.z, spillL, it.soapy, it.mix);
+      if (Math.random() < dt * 3) play('plop', mouth, 0.35);
+    }
+    if (colH > 0.003 && up.y >= 0.5) {
+      if (!it.col) { it.col = new THREE.Mesh(foamColGeo, foamMat(foamColor(it.mix))); it.col.castShadow = true; scene.add(it.col); it.extras.push(it.col); }
+      const c = it.col, wob = Math.sin(t * 7 + it.id) * 0.06, r = d.rimR * 1.06 * (1 + Math.min(1.3, colH * 5)); // it swells as it leaves the neck
+      c.visible = true;
+      c.position.copy(mouth); c.position.y -= 0.01;
+      c.scale.set(r * (1 + wob * 0.3), colH + 0.01, r * (1 - wob * 0.3));
+      c.rotation.set(Math.sin(t * 1.3 + it.id) * Math.min(0.25, colH * 1.2), t * 0.4, Math.cos(t * 1.1 + it.id) * Math.min(0.25, colH * 1.2));
+      if (Math.random() < dt * 4) G.P.emit({ pos: V(mouth.x + (Math.random() - 0.5) * r, mouth.y + colH, mouth.z + (Math.random() - 0.5) * r), vel: V(0, 0.15, 0), life: 0.25, size: 0.008, size1: 0.02, tex: 'bubble', alpha: 0.9 });
+    } else if (it.col) it.col.visible = false;
+  }
+
   // ---------- puddles and piles ----------
   function spill(mix, x, y, z) {
     if (mix.isEmpty()) return null;
@@ -412,13 +500,15 @@ export function createMatter(G) {
       if (Math.abs(m - it.body.mass) > 0.004 + it.body.mass * 0.02) { it.body.mass = m; it.body.updateMassProperties(); }
     }
     const a = it.an, up = it.up, base = it.base;
-    it.foam = Math.max(0, it.foam - it.foam * dt * 0.12);
+    const insideFree = Math.max(0, d.cap - a.total);
+    updateFoamColumn(it, dt, t, insideFree);
     it.skitter = Math.max(0, it.skitter - dt);
-    const total = a.total + it.foam;
+    const foamIn = Math.min(it.foam, insideFree);
+    const total = a.total + foamIn;
     const yw = (h) => base.y + up.y * h;
     // liquid layers, each clipped between two horizontal planes so the surface stays level when you tilt
     let cum = 0, k = 0, hPrev = d.inner[0][1] - 0.002, topH = hPrev, topLayer = null;
-    const list = it.foam > 0.0005 ? [...a.layers, { key: 'foam', vol: it.foam, color: '#ffffff', alpha: 0.92 }] : a.layers;
+    const list = foamIn > 0.0003 ? [...a.layers, { key: 'foam', vol: foamIn, color: '#' + new THREE.Color(foamColor(mix)).getHexString(), alpha: 0.97 }] : a.layers;
     for (const l of list) {
       if (k >= it.layers.length) break;
       cum += l.vol;
@@ -471,7 +561,7 @@ export function createMatter(G) {
     const hFill = d.heightFor(Math.min(total, d.cap));
     const sinT = Math.sin(tilt), rimLowY = yw(d.H) - d.rimR * sinT;
     let head = yw(hFill) - rimLowY + over * 0.4;
-    const dry = a.liquid < 1e-5 && it.foam < 1e-4;
+    const dry = a.liquid < 1e-5;
     if (dry && tilt < 0.62) head = 0;
     if (head > 0.0003) {
       const w = Math.min(d.spout, d.rimR * 1.2);
@@ -495,7 +585,6 @@ export function createMatter(G) {
         const ax = up.x, ay = Math.min(0, up.y), az = up.z, al = Math.hypot(ax, ay, az) || 1;
         t3.set(ax / al * vo + bv.x, ay / al * vo + bv.y - 0.05, az / al * vo + bv.z);
         let vol = it.pourAcc; it.pourAcc = 0; it.pourT = 0;
-        if (it.foam > 0.0005 && (over > 0 || a.total < 1e-5)) { const f = Math.min(it.foam, vol); it.foam -= f; emitParcel(mix.takeVolume(f * 0.08), t2, t3, { color: '#ffffff', foam: a.total < 1e-5, src: it }); vol -= f; }
         if (vol > 1e-6 && a.total > 1e-6) { emitParcel(mix.takeVolume(vol), t2, t3, { src: it }); if (G.emitLog && G.emitLog.length < 40) G.emitLog.push({ p: t2.toArray().map((v) => +v.toFixed(3)), v: t3.toArray().map((v) => +v.toFixed(2)), up: up.toArray().map((v) => +v.toFixed(2)), q: +q.toFixed(3), head: +head.toFixed(3) }); }
         it.dirty = true; it.changed = G.time;
       }
@@ -573,6 +662,7 @@ export function createMatter(G) {
     }
     absorb();
     updateParcels(dt);
+    updateHeaps(dt, t);
     for (let i = puddles.length - 1; i >= 0; i--) updatePuddle(puddles[i], t);
     for (let i = shards.length - 1; i >= 0; i--) {
       const s = shards[i]; s.life -= dt;
@@ -583,12 +673,13 @@ export function createMatter(G) {
   function clearAll() {
     for (const it of [...items]) remove(it);
     for (const pd of puddles) disposePuddle(pd); puddles.length = 0;
+    for (const q of heaps) scene.remove(q.m); heaps.length = 0;
     parcels.length = 0; parcelMesh.count = 0;
     for (const s of shards) { scene.remove(s.m); phys.world.removeBody(s.b); } shards.length = 0;
   }
   // world position where a holder's contents meet the air (for flames, fumes, bubbles)
   function topOf(h, out = V()) {
-    if (h.kind === 'vessel') { const y = h.an && h.an.total > 0 ? Math.min(h.def.H, h.def.heightFor(Math.min(h.an.total + h.foam, h.def.cap))) : h.def.inner[0][1]; return out.set(h.base.x + h.up.x * y, h.base.y + h.up.y * y, h.base.z + h.up.z * y); }
+    if (h.kind === 'vessel') { const y = h.an && h.an.total > 0 ? Math.min(h.def.H, h.def.heightFor(Math.min(h.an.total + h.foam, h.def.cap)) + (h.col && h.col.visible ? h.col.scale.y : 0)) : h.def.inner[0][1]; return out.set(h.base.x + h.up.x * y, h.base.y + h.up.y * y, h.base.z + h.up.z * y); }
     if (h.kind === 'puddle') return out.set(h.x, h.y + 0.01, h.z);
     return out.set(h.body.position.x, h.body.position.y, h.body.position.z);
   }
@@ -598,5 +689,5 @@ export function createMatter(G) {
     return out.set(h.body.position.x, h.body.position.y, h.body.position.z);
   }
 
-  return { items, puddles, parcels, makeVessel, makeLump, makeProp, fill, place, remove, shatter, spillAll, spill, emitParcel, takeChunk, update, clearAll, topOf, posOf, sync, M };
+  return { foamAt, heaps, items, puddles, parcels, makeVessel, makeLump, makeProp, fill, place, remove, shatter, spillAll, spill, emitParcel, takeChunk, update, clearAll, topOf, posOf, sync, M };
 }

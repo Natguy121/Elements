@@ -21,6 +21,7 @@ import { createSim } from './matter/sim.js';
 import { createHud, TOOLS } from './ui/hud.js';
 import { createStory, storyDefaults } from './story.js';
 import { createNet } from './net.js';
+import { createAsk } from './ui/ask.js';
 
 const $ = (id) => document.getElementById(id);
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -443,8 +444,11 @@ function boot() {
   // ---------- pause, book, menu ----------
   function openPause() { uiOpen = true; input.st.enabled = false; hud.openPause(); }
   function openBook(tab) { uiOpen = true; input.st.enabled = false; input.unlock(); hud.openBook(tab); }
+  const askUI = createAsk(() => { if (state === 'play') G.hooks.resume(); });
   function uiKeys() {
     if (state !== 'play') return;
+    if (askUI.isOpen) { if (input.hit('Escape')) askUI.close(); return; }
+    if (input.hit('KeyT') && !hud.bookOpen && !hud.pauseOpen) { uiOpen = true; input.st.enabled = false; input.unlock(); askUI.open(); play('ui'); return; }
     if (input.hit('KeyH') && (G.story || G.settings.mode !== 'discovery') && !hud.bookOpen && !hud.pauseOpen) { hud.guide(); play('ui'); }
     if (input.hit('KeyZ') && !hud.bookOpen && !hud.pauseOpen) {
       // fast-forward chemistry and heat (not your legs): for slow reactions, cooling and crystal growing
@@ -563,7 +567,7 @@ function boot() {
 
   // ---------- main loop ----------
   const dbg = { maxDt: 0.05, speed: 1, freeze: false };
-  window.__lab = { G, grab, matter, sim, gas, lab, player, input, dbg, findTarget, primary, story, startMode, get net() { return net; }, selectTool: (t) => { tool = t; refreshTool(); }, state: () => state };
+  window.__lab = { G, grab, matter, sim, gas, lab, player, input, dbg, findTarget, primary, story, startMode, askUI, get net() { return net; }, selectTool: (t) => { tool = t; refreshTool(); }, state: () => state };
   let last = performance.now(), slow = 0, frames = 0;
   // one step of the whole game, without drawing it (tests call this directly to run fast)
   function step(dt) {

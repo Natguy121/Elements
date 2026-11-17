@@ -69,6 +69,15 @@ The rock pick also crushes lumps to powder, on the ground or inside a container.
 
 Sleeping in your bed regrows the forest and restocks the kitchen. Only findable materials are in Story Mode: nothing synthetic, radioactive or restricted.
 
+## Lab Assistant
+
+Press **T** (or Ask on touch) to chat with the Lab Assistant, a small offline helper built into the page. It needs no internet and no AI service.
+
+- It stores over 3,000 questions with answers, generated from the game's own data (every reaction, substance, element, discovery, material and goal) plus written answers on how to play and basic chemistry ideas.
+- "What does A and B make?" and "How do I make X?" are worked out directly from the reaction rules, with the equation, the conditions (heat, flame, catalyst, powder) and the science.
+- Anything else is matched to the closest stored question by word overlap (TF-IDF).
+- It only knows this game. It is not a general chatbot.
+
 ## Multiplayer
 
 On the title screen, **Host game** opens a room and shows a 5-letter code. Friends type the code and press **Join**. Then the host picks Story Mode or Normal Mode, and everyone plays in the host's world. It also works if the host starts the game first and friends join later.
@@ -173,6 +182,7 @@ Every locked element already has a real source mineral, a processing method and 
 | `js/physics/` | cannon-es world and the grab system |
 | `js/matter/` | Containers, lumps, props, pouring, spills, breakage (`items.js`), gas clouds and explosions (`gas.js`), and the simulation loop tying heat, reactions and effects together (`sim.js`) |
 | `js/world/` | The lab room and its fixtures, the Story Mode outdoors (`outdoors.js`), doors, and all canvas-painted textures |
+| `js/assistant.js`, `js/ui/ask.js` | The offline Lab Assistant and its chat window |
 | `js/net.js` | Multiplayer: room codes, host snapshots, guest input, avatars |
 | `js/story.js`, `js/story-data.js`, `data/materials.json` | Story Mode: gathering, storage and saving, goals, unlocks, the 18 materials |
 | `js/ui/hud.js` | HUD, banners, Discovery Book, periodic table, notebook, settings |

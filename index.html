@@ -62,6 +62,7 @@
       <button type="button" data-press="KeyZ">Time</button>
       <button type="button" data-press="KeyH" class="stu">Guide</button>
       <button type="button" data-press="KeyH" class="story-only">Goals</button>
+      <button type="button" data-press="KeyT">Ask</button>
       <button type="button" data-press="Escape">Menu</button>
     </div>
   </div>
@@ -97,7 +98,7 @@
         <div><dt>Tools</dt><dd>1 tongs · 2 spatula · 3 pipette · 4 thermometer · 5 extinguisher · Story Mode: 6 rock pick (break off samples, crush lumps to powder) · 7 trowel (dig sand) · press again to put away</dd></div>
         <div><dt>Story</dt><dd>F opens doors, sleeps in your bed and fills a held container at a tap, the stream or the lake · H goals · the Materials tab in the book lists what you have found</dd></div>
         <div><dt>Together</dt><dd>Host game gives you a 5-letter code. Friends type it and press Join, then everyone plays in the host's Normal or Story world. Up to about 4 players works best.</dd></div>
-        <div><dt>Other</dt><dd>F use a switch or tap, or the torch · E inspect · Tab Discovery Book · P periodic table · N notebook · Esc menu · Z fast-forward time (×4, ×16) · H experiment guide (Student mode)</dd></div>
+        <div><dt>Other</dt><dd>F use a switch or tap, or the torch · E inspect · Tab Discovery Book · P periodic table · N notebook · Esc menu · Z fast-forward time (×4, ×16) · H experiment guide (Student mode) · T ask the Lab Assistant</dd></div>
         <div><dt>Touch</dt><dd>Left thumb walks, drag to look, tap a thing to pick it up and tap again to let go</dd></div>
       </dl>
       <p class="fine">Physics of grabbing and carrying, containers and pouring, and a rules-based chemistry engine with 41 reactions, including acids, bases, indicators, crystals, smelting and glassmaking. All chemistry is simplified for play. It is not a guide to real procedures.</p>
@@ -158,6 +159,14 @@
         <div class="notes-col"><h3>Experiment log</h3><ol id="log" class="log"></ol></div>
         <div class="notes-col"><h3>Your notes</h3><textarea id="notes" placeholder="Write down what worked. Amounts and temperatures help."></textarea></div>
       </div>
+    </div>
+  </section>
+
+  <section id="ask" class="modal ask-modal" hidden>
+    <div class="ask-card" role="dialog" aria-labelledby="askTitle">
+      <header class="ask-head"><div><h2 id="askTitle">Lab Assistant</h2><span id="askCount" class="count"></span></div><button id="askClose" class="btn small" type="button">Close</button></header>
+      <div id="askLog" class="ask-log" aria-live="polite"></div>
+      <form id="askForm" class="ask-form"><input id="askInput" type="text" autocomplete="off" placeholder="Ask: what does baking soda and vinegar make?" aria-label="Your question"><button class="btn primary" type="submit">Ask</button></form>
     </div>
   </section>
 

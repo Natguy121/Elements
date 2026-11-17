@@ -41,6 +41,18 @@ const NOT_IN_GAME = [
   [/\bgunpowder|explosive|bomb|tnt\b/, 'That', 'I do not help with explosives. In the game, sodium in water and hydrogen with a flame make safe virtual bangs.'],
 ];
 
+// where each supply sits in the Normal Mode lab
+const SPOT = {
+  island: 'on the right-hand island bench in the middle of the lab (the kitchen chemistry)',
+  cabinet: 'on the back bench, right side, with the acids, alkalis and indicators (the teaching cabinet)',
+  store: 'in element storage on the west wall shelves',
+};
+const WHERE = {
+  nahco3: 'island', acetic_acid: 'island', h2o2: 'island', yeast: 'island', indicator: 'island', soap: 'island', dye_blue: 'island', sucrose: 'island', nacl: 'island', starch: 'island', oil: 'island', ethanol: 'island', water: 'island',
+  hcl: 'cabinet', naoh: 'cabinet', citric: 'cabinet', caco3: 'cabinet', cuso4: 'cabinet', alum: 'cabinet', cabbage: 'cabinet', phph: 'cabinet',
+  sodium: 'store', potassium: 'store', lithium: 'store', calcium: 'store', magnesium: 'store', iron: 'store', copper: 'store', carbon: 'store', aluminium: 'store', sulfur: 'store', phosphorus_red: 'store', mercury: 'store', silicon: 'store', gold: 'store',
+};
+
 export function createAssistant() {
   // ---------- names of things ----------
   const alias = new Map(); // phrase -> substance id
@@ -116,6 +128,7 @@ export function createAssistant() {
       else if (e.state === 'gas') bits.push(`${e.name} is unlocked, but you cannot hold a sample yet: gas cylinders arrive with the gas-handling update.${made.length ? '' : ''}`);
       else bits.push(`${e.name} is one of the starting elements.`);
     } else bits.push(`${e.name} is locked (tier ${e.tier || '?'}). It needs equipment from a later update.`);
+    if (e.start && !mats.length && e.state !== 'gas') bits.push('Story Mode: it is not found outside, so it is not available there yet.');
     if (made.length) bits.push(`You can make it: ${made.map((r) => `${r.name}. ${how(r)}`).join(' Or: ')}`);
     if (mats.length) bits.push(`In Story Mode: ${mats.map((m) => `${m.name}: ${m.where}`).join(' ')}`);
     const real = REAL[e.sym] || [e.hint, e.method && 'Method: ' + e.method].filter(Boolean).join(' ');
@@ -141,8 +154,15 @@ export function createAssistant() {
     if (s.formula) put('sub:' + id, 'formula', [`what is the formula of ${n}`, `formula for ${n}`], `${s.name} is ${s.formula}.`);
     put('sub:' + id, 'danger', [`is ${n} dangerous`, `is ${n} safe to touch`], (s.tags || []).length ? `${s.name} is tagged ${list((s.tags || []).map((t) => t.replace(/_/g, ' ')))}. ${s.handle === 'tongs' ? 'Use tongs (1): it burns bare skin.' : 'Handle it carefully.'}` : `${s.name} is not hazardous in the game.`);
     put('sub:' + id, 'react', [`what reacts with ${n}`, `what can I mix with ${n}`, `what can I do with ${n}`], used.length ? `${s.name} is used in: ${used.map((r) => r.name + ' (with ' + list([...r.inputs.filter((i) => i.id !== id && i.from !== 'air').map((i) => lc(SUB[i.id].name)), ...(r.inputs.some((i) => i.from === 'air') ? ['air'] : [])]) + ')').join('; ')}.` : `Nothing in the game reacts with ${n} yet, but it can still dissolve, melt or boil.`);
-    const getIt = [`**How to get ${n}.**`, id === 'water' ? 'In Normal Mode turn on the cold tap at the sink (F).' : s.supply ? 'It is on the lab shelves in Normal Mode.' : '', mat ? `In Story Mode: ${mat.where} How: ${lc(mat.how)}.` : '',
-      made.length ? `${s.supply || mat ? 'It can also be made' : 'Make it'}: ${made.slice(0, 2).map((r) => `${r.name}. ${how(r)}`).join(' Or: ')}${made.length > 2 ? ` (and ${made.length - 2} more reactions)` : ''}` : '', !made.length && !s.supply && !mat ? 'It cannot be made in the game yet.' : ''].filter(Boolean).join(' ');
+    // reactions that need the thing itself to start are not a way to get it
+    const realMade = made.filter((r) => !r.inputs.some((i) => (SUB[i.id].name.toLowerCase().includes(n) || n.includes(SUB[i.id].name.toLowerCase())) && i.id !== id) || r.inputs.some((i) => i.id === id));
+    const loop = made.filter((r) => !realMade.includes(r));
+    const getIt = [`**How to get ${n}${(EXTRA_ALIASES[id] || [])[0] && !n.includes(EXTRA_ALIASES[id][0]) ? ' (' + EXTRA_ALIASES[id][0] + ')' : ''}.**`,
+      id === 'water' ? 'Normal Mode: turn on the cold tap at the sink (F), or use the distilled water bottle on the island bench.' : WHERE[id] ? `Normal Mode: it is ${SPOT[WHERE[id]]}.` : s.supply ? 'Normal Mode: it is on the lab shelves.' : '',
+      mat ? `Story Mode: ${mat.where}${/kitchen/i.test(mat.how) ? '' : ' (' + lc(mat.how) + ').'}` : WHERE[id] || s.supply ? `Story Mode: it cannot be found outside, so it is not available there yet.` : '',
+      realMade.length && id !== 'water' ? `${WHERE[id] || mat ? 'You can also make it' : 'Make it'}: ${realMade.slice(0, 2).map((r) => `${r.name}. ${how(r)}`).join(' Or: ')}${realMade.length > 2 ? ` (and ${realMade.length - 2} more ways)` : ''}` : '',
+      loop.length ? `(${loop.map((r) => r.name).join(', ')} only turns another form of ${n} back into ${n}, so you need some to start with.)` : '',
+      !made.length && !s.supply && !mat ? 'It cannot be made in the game yet.' : ''].filter(Boolean).join(' ');
     put('sub:' + id, 'get', [`how do I make ${n}`, `how to get ${n}`, `where does ${n} come from`, `where do I find ${n}`], getIt);
     put('sub:' + id, 'dissolve', [`does ${n} dissolve in water`, `is ${n} soluble`], s.sol ? `Yes: about ${s.sol} g dissolves in 100 g of water at 20 °C${s.solHot !== undefined ? `, and ${s.solHot} g when hot, so it crystallises as it cools` : ''}.` : s.state === 's' ? `No, ${n} does not dissolve in water.` : `${s.name} is a ${s.state === 'l' ? 'liquid' : 'gas'}.`);
   }

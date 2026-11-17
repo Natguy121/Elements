@@ -26,6 +26,21 @@ const EXTRA_ALIASES = {
   wood: ['stick', 'sticks', 'branch'], berries: ['elderberry', 'elderberries', 'berry'], citric: ['citric acid'], yeast: ['catalase'], cuo: ['copper oxide', 'black copper'], mgo: ['magnesium oxide'],
 };
 
+// common chemicals people ask about that the lab does not have (yet): how industry makes them
+const NOT_IN_GAME = [
+  [/\bsulfuric acid|sulphuric acid|h2so4\b/, 'Sulfuric acid', 'factories burn sulfur to sulfur dioxide, turn that into sulfur trioxide over a vanadium oxide catalyst (the contact process), and absorb it into acid. It is one of the most made chemicals in the world, used for fertilisers and batteries. It is very corrosive.'],
+  [/\bnitric acid|hno3\b/, 'Nitric acid', 'made from ammonia, burned over a platinum catalyst and dissolved in water (the Ostwald process). Used for fertilisers and explosives.'],
+  [/\bammonia|nh3\b/, 'Ammonia', 'made from nitrogen in the air and hydrogen at high pressure over an iron catalyst (the Haber process). Most of it becomes fertiliser.'],
+  [/\bsteel\b/, 'Steel', 'iron with a little carbon. Iron from a blast furnace has oxygen blown through it to burn off extra carbon.'],
+  [/\bbronze\b/, 'Bronze', 'copper melted together with about 10% tin. It started the Bronze Age about 5000 years ago.'],
+  [/\bbrass\b/, 'Brass', 'copper melted together with zinc.'],
+  [/\bplastic|polyethylene|polythene\b/, 'Plastic', 'most plastics are made from oil: small molecules like ethene are joined into long chains (polymerisation).'],
+  [/\bsoap\b(?! .*(vinegar|soda|peroxide))/, 'Soap (making it)', 'fats or oils are boiled with a strong alkali (saponification). The lab has dish soap ready to use for foam.'],
+  [/\bbleach\b/, 'Bleach', 'chlorine bubbled through sodium hydroxide solution makes sodium hypochlorite. Never mix bleach with acids or ammonia.'],
+  [/\bdiamond\b/, 'Diamond', 'pure carbon squeezed at enormous pressure and heat deep underground, or in factory presses.'],
+  [/\bgunpowder|explosive|bomb|tnt\b/, 'That', 'I do not help with explosives. In the game, sodium in water and hydrogen with a flame make safe virtual bangs.'],
+];
+
 export function createAssistant() {
   // ---------- names of things ----------
   const alias = new Map(); // phrase -> substance id
@@ -227,6 +242,7 @@ export function createAssistant() {
   function ask(raw) {
     const q = norm(raw);
     if (!q) return { a: 'Ask me anything about the lab: what two things make, how to make something, where to find a material...' };
+    for (const [re, name, real] of NOT_IN_GAME) if (re.test(q) && !findSubs(q.replace(re, ' ')).length) return { a: `**${name}** is not in the game yet, so you cannot make it in the lab. In the real world: ${real}`, related: ['what can I make', 'how do I make glass'] };
     const subs = findSubs(q);
     // one thing asked about: work out what kind of question it is, then answer exactly that
     const words = q.split(' ');
@@ -273,9 +289,11 @@ export function createAssistant() {
       if (used.length) return { a: `${SUB[id].name} reacts in:\n\n` + used.slice(0, 4).map(rxText).join('\n\n'), via: 'worked out from the reaction rules' };
     }
     const hits = search(q, 3);
+    const mk = q.match(/^(?:how (?:do|can|would|could) (?:i|we|you) |how to )(?:make|get|create|produce) (?:a |an |some )?(.+)$/);
+    if (mk && !subs.length && !(hits[0] && hits[0].score > 0.6)) return { a: `I do not know "${mk[1]}" in this game, so there is no way to make it here yet. Things you can make include copper, iron, glass, quicklime, rust, washing soda, caramel and hydrogen. Ask "how do I make glass" for steps.`, related: ['how do I make copper', 'what can I make'] };
     if (hits.length && hits[0].score > 0.32) return { a: hits[0].a, related: hits.slice(1).filter((h) => h.score > 0.25).map((h) => h.q) };
     if (subs.length === 1) { const s = SUB[subs[0]]; return { a: `**${s.name}**${s.formula ? ' (' + s.formula + ')' : ''}: ${s.fact || ''}`, related: [`what reacts with ${lc(s.name)}`, `how do I make ${lc(s.name)}`] }; }
-    const el = q.split(' ').map((w) => elByName.get(w) || (w.length <= 2 && elBySym.get(w))).find(Boolean);
+    const el = q.split(' ').map((w) => elByName.get(w) || (w.length <= 2 && !STOP.has(w) && w !== 'i' && w !== 'a' && elBySym.get(w))).find(Boolean);
     if (el) return ask('what is ' + el.name);
     if (hits.length && hits[0].score > 0.15) return { a: 'I am not sure I understood. The closest thing I know:\n\n' + hits[0].a, related: hits.slice(1).map((h) => h.q) };
     return { a: 'I do not know that one. I only know this game: its reactions, substances, elements, materials and controls. Try "what does baking soda and vinegar make", "how do I make copper" or "where do I find sulfur".' };

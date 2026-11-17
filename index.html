@@ -25,6 +25,7 @@
   <div id="hud" hidden>
     <div id="cross" class="cross"></div>
     <div id="timeChip" class="timechip" hidden></div>
+    <div id="netChip" class="netchip" hidden></div>
     <div id="target" class="target" hidden><b id="targetName"></b><span id="targetSub"></span></div>
     <div id="prompt" class="prompt"></div>
     <div id="banner" class="banner" hidden>
@@ -82,12 +83,20 @@
         </div>
         <button id="btnHow" class="btn small" type="button">Controls</button>
       </div>
+      <div class="mp">
+        <span class="h-label">Multiplayer</span>
+        <input id="mpName" class="mp-name" type="text" maxlength="20" aria-label="Your name" placeholder="Your name">
+        <button id="btnHost" class="btn small" type="button">Host game</button>
+        <span id="joinBox" class="join"><input id="joinCode" type="text" maxlength="6" placeholder="CODE" aria-label="Room code" autocomplete="off" spellcheck="false"><button id="btnJoin" class="btn small" type="button">Join</button></span>
+        <span id="mpStatus" class="mp-status" aria-live="polite"></span>
+      </div>
       <dl id="how" class="how" hidden>
         <div><dt>Move</dt><dd>W A S D · Shift sprint · Space jump · C crouch · Q / E lean</dd></div>
         <div><dt>Hands</dt><dd>Hold left mouse to grab · let go to drop, swing to throw · wheel pushes and pulls · R + mouse rotates · X sets it down gently</dd></div>
         <div><dt>Pour / use</dt><dd>Hold right mouse while holding a container to pour, or to use the tool in your hand</dd></div>
         <div><dt>Tools</dt><dd>1 tongs · 2 spatula · 3 pipette · 4 thermometer · 5 extinguisher · Story Mode: 6 rock pick (break off samples, crush lumps to powder) · 7 trowel (dig sand) · press again to put away</dd></div>
         <div><dt>Story</dt><dd>F opens doors, sleeps in your bed and fills a held container at a tap, the stream or the lake · H goals · the Materials tab in the book lists what you have found</dd></div>
+        <div><dt>Together</dt><dd>Host game gives you a 5-letter code. Friends type it and press Join, then everyone plays in the host's Normal or Story world. Up to about 4 players works best.</dd></div>
         <div><dt>Other</dt><dd>F use a switch or tap, or the torch · E inspect · Tab Discovery Book · P periodic table · N notebook · Esc menu · Z fast-forward time (×4, ×16) · H experiment guide (Student mode)</dd></div>
         <div><dt>Touch</dt><dd>Left thumb walks, drag to look, tap a thing to pick it up and tap again to let go</dd></div>
       </dl>

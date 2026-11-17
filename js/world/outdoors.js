@@ -326,7 +326,7 @@ export function buildOutdoors(G) {
   }
   const rockGeo = (seed, flat = 0.7) => { const g = new THREE.IcosahedronGeometry(1, 2), p = g.attributes.position, r2 = rng(seed); const a = [r2() * 5, r2() * 5, r2() * 5]; for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), n = 1 + 0.2 * Math.sin(x * 3 + a[0]) * Math.cos(z * 3 + a[1]) + 0.1 * Math.sin(y * 7 + a[2]); p.setXYZ(i, x * n, y * n * flat, z * n); } g.computeVertexNormals(); return g; };
   {
-    const im = new THREE.InstancedMesh(rockGeo(5), std({ color: 0x8a877e, roughness: 0.95, flatShading: true }), 70);
+    const im = new THREE.InstancedMesh(rockGeo(5), std({ color: 0x8a877e, roughness: 0.95, flatShading: true }), 80);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = V(), p = V();
     let i = 0;
     for (let k = 0; k < 400 && i < 70; k++) { const x = BOUNDS.x0 + R() * 136, z = BOUNDS.z0 + R() * 140; if (!clear(x, z, -1)) continue; const r = 0.15 + R() * 0.35; m.compose(p.set(x, heightAt(x, z), z), q.setFromEuler(new THREE.Euler(R(), R() * 6, R() * 0.3)), s.set(r * 1.3, r, r)); im.setMatrixAt(i++, m); }
@@ -521,7 +521,7 @@ export function buildOutdoors(G) {
     if (ventT <= 0 && Math.hypot(p.x - CAVE.x, p.z - CAVE.z) < 20) { ventT = 0.35; const [vx, vz] = caveAt(Math.PI, 4.9); G.P.emit({ pos: V(vx, 0.5, vz), vel: V((Math.random() - 0.5) * 0.1, 0.35, (Math.random() - 0.5) * 0.1), life: 3, size: 0.08, size1: 0.5, color: 0xd8d4b0, alpha: 0.25, tex: 'smoke' }); }
     // deposits slowly regrow, and pickups come back when you are not looking
     for (const d of deposits) if (d.left < d.n) { d.regen += dt; if (d.regen > 120) { d.regen = 0; d.left++; } }
-    for (const sp of spawners) { sp.t += dt; if (sp.t > sp.every) { sp.t = 0; if (alive(sp) < sp.max && Math.hypot(p.x - sp.at[0], p.z - sp.at[1]) > 18) spawnOne(sp); } }
+    if (!G.netGuest) for (const sp of spawners) { sp.t += dt; if (sp.t > sp.every) { sp.t = 0; if (alive(sp) < sp.max && Math.hypot(p.x - sp.at[0], p.z - sp.at[1]) > 18) spawnOne(sp); } }
     // wading slows you down
     const feet = G.player.body.position.y - 0.3, wl = waterLevelAt(G.player.body.position.x, G.player.body.position.z);
     G.player.slow = wl !== null && feet < wl - 0.08 ? 0.6 : 1;

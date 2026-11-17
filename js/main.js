@@ -20,6 +20,7 @@ import { createGas } from './matter/gas.js';
 import { createSim } from './matter/sim.js';
 import { createHud, TOOLS } from './ui/hud.js';
 import { createStory, storyDefaults } from './story.js';
+import { createNet } from './net.js';
 
 const $ = (id) => document.getElementById(id);
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -110,6 +111,7 @@ function boot() {
     if (G.time - coughT > 1.6) { coughT = G.time; play('cough'); hud.toast('Fumes', dose > 1 ? 'You are breathing something toxic. Get out of the cloud.' : 'That smoke stings. Step back.', 'warn'); }
   };
   G.hooks.restock = () => {
+    if (net.guest) { hud.toast('Restock', 'Only the host can restock.'); return; }
     grab.release(false); gas.clear(); lab.reset(); toolLoad = new Mixture(20); play('ding');
     if (G.story) {
       // Story Mode: clean glassware only. Your stored samples and what you carried in stay put.
@@ -127,7 +129,7 @@ function boot() {
   };
   G.hooks.applySettings = applySettings;
   G.hooks.resume = () => { uiOpen = false; input.st.enabled = true; if (state === 'play') input.lock(); };
-  G.hooks.title = () => { if (G.story) { story.serialize(); persistNow(); } showMeta(); state = 'menu'; uiOpen = false; input.st.enabled = false; input.unlock(); hud.show(false); $('menu').hidden = false; $('touch').hidden = true; };
+  G.hooks.title = () => { if (G.story && !G.netGuest) { story.serialize(); persistNow(); } if (net.guest) net.leave(); showMeta(); state = 'menu'; net.modeChanged(null); uiOpen = false; input.st.enabled = false; input.unlock(); hud.show(false); $('menu').hidden = false; $('touch').hidden = true; };
   G.hooks.selectTool = (id) => selectTool(id);
   { const hurt0 = player.hurt; player.hurt = (a, why, now) => hurt0(goggles() && why === 'blast' ? a * 0.6 : a, why, now); }
   player.onHurt = (amt) => { hud.hurt(Math.min(1, 0.3 + amt / 30)); };
@@ -273,6 +275,8 @@ function boot() {
 
   function primary(tg) {
     const b = tg.best, it = b && b.item;
+    G.netTouch = G.time;
+    if (it && net.otherHolds(it) && tool !== 'spatula' && tool !== 'pipette' && tool !== 'trowel') return hud.toast('Busy', 'Someone else is holding that.');
     const holder = it && it.mix && it.kind === 'vessel' ? it : tg.puddle;
     if (tool === 'spatula') {
       if (!holder) return hud.toast('Spatula', 'Point it at a jar or a pile of powder.');
@@ -304,6 +308,7 @@ function boot() {
     grab.start(it, b.point, 'hand');
   }
   function secondary(tg, first, dt) {
+    G.netTouch = G.time;
     const it = tg.best && tg.best.item, holder = it && it.kind === 'vessel' ? it : tg.puddle;
     const ahead = () => player.pos.clone().addScaledVector(player.dir, 0.55);
     if (grab.item && grab.item.tool === 'lighter') { if (first) play('spark', grab.item.body.position); lighterOn = true; return; }
@@ -381,7 +386,7 @@ function boot() {
     if (st.rmb) secondary(tg, !lastRmb, dt);
     lastRmb = st.rmb;
     if (input.hit('KeyX')) grab.place();
-    if (input.hit('KeyF')) { if (tg.fixture) tg.fixture.use(); else if (tg.story && tg.story.water && grab.item && grab.item.kind === 'vessel') G.hooks.fillWater(tg.story.water === 'Lake' ? 'the lake' : 'the stream'); else { torchOn = !torchOn; torch.intensity = torchOn ? 26 : 0; play('click'); } }
+    if (input.hit('KeyF')) { if (tg.fixture) { if (!net.useFixture(tg.fixture)) tg.fixture.use(); } else if (tg.story && tg.story.water && grab.item && grab.item.kind === 'vessel') G.hooks.fillWater(tg.story.water === 'Lake' ? 'the lake' : 'the stream'); else { torchOn = !torchOn; torch.intensity = torchOn ? 26 : 0; play('click'); } }
     // E inspects whatever you hold or look at; with nothing there it leans
     const subject = grab.item || (tg.best && tg.best.item);
     if (input.hit('KeyE') || input.hit('KeyE2')) { if (inspecting) inspecting = null; else if (subject) inspecting = subject; }
@@ -466,23 +471,27 @@ function boot() {
   G.hooks.modeChanged = showMode;
   // Story Mode or Normal Mode. Normal is the free sandbox exactly as before; Story builds the outdoors the first time.
   let worldMode = 'normal';
-  function startMode(mode) {
+  function startMode(mode, o = {}) {
+    if (net.guest && !o.guest) { hud.toast('Multiplayer', 'You are in someone else\'s game. Leave it first.'); return; }
     initAudio(); setVolume(G.settings.volume); play('ding');
-    if (mode !== worldMode) {
+    if (mode !== worldMode || o.guest) {
       grab.release(false);
       if (G.story) story.stop();
       matter.clearAll(); gas.clear(); lab.reset(); toolLoad = new Mixture(20); tool = null;
       sim.progress.rx = {}; sim.progress.sub = {};
       G.timeScale = 1; $('timeChip').hidden = true;
-      if (mode === 'story') story.start();
-      else { G.prog = save; G.have = new Set(START_HAVE); lab.populate(); }
-      worldMode = mode;
-    }
+      if (mode === 'story') story.start(o);
+      else { G.prog = save; G.have = new Set(START_HAVE); if (!o.guest) lab.populate(); }
+      worldMode = o.guest ? 'guest-' + mode : mode;
+      if (!o.guest) net.modeChanged(mode);
+    } else net.modeChanged(mode);
     hud.setStory(G.story);
     state = 'play'; $('menu').hidden = true; hud.show(true); uiOpen = false; input.st.enabled = true;
     $('touch').hidden = input.st.mode !== 'tap';
     if (mode === 'normal') { player.teleport(0, 0.35, 3.2); player.yaw = 0; player.pitch = -0.08; }
-    input.lock(); refreshTool();
+    try { input.lock(); } catch (e) { /* the browser may refuse until a click */ }
+    refreshTool();
+    if (o.guest) { hud.guide(false); hud.toast('Multiplayer', 'Joined. Everyone sees what you grab and pour.'); return; }
     if (!save.seenIntro) { save.seenIntro = true; persist(); hud.toast('Tip', 'Hold the left mouse button to carry things. Right button pours.'); }
     if (G.story) { hud.guide(true); return; }
     if (G.settings.mode !== 'discovery') { hud.guide(true); hud.toast('Student mode', 'Follow the experiment guide (H), or explore on your own.'); } else { hud.guide(false); hud.toast('Discovery mode', 'No hints. Use an indicator for pH and the thermometer (4) for temperature.'); }
@@ -494,6 +503,34 @@ function boot() {
   showMeta();
   $('btnStory').onclick = () => startMode('story');
   $('btnNormal').onclick = () => startMode('normal');
+
+  // ---------- multiplayer ----------
+  const net = createNet(G, {
+    matter, grab, player, hud, scene, lab, story,
+    mode: () => (state === 'menu' ? null : worldMode ? worldMode.replace('guest-', '') : null),
+    target: () => targetNow && targetNow.best && targetNow.best.item,
+    enterAsGuest: (mode) => { worldMode = ''; startMode(mode, { guest: true }); },
+    onLeft: () => { if (state !== 'menu') G.hooks.title(); },
+    onStatus: () => showNet(),
+  });
+  G.net = net;
+  function showNet() {
+    const r = net.role, st = net.status;
+    $('mpStatus').textContent = r === 'host' ? (net.code ? `Room code ${net.code} · ${st}${net.count > 1 ? ' · ' + net.count + ' players' : ''}` : st) : st;
+    $('btnHost').hidden = r === 'guest'; $('btnHost').textContent = r === 'host' ? 'Stop hosting' : 'Host game';
+    $('joinBox').hidden = r === 'host';
+    $('btnJoin').textContent = r === 'guest' ? 'Leave' : 'Join';
+    $('joinCode').disabled = r === 'guest';
+    $('netChip').hidden = !r;
+    $('netChip').textContent = r === 'host' ? `Room ${net.code} · ${net.count} player${net.count === 1 ? '' : 's'}` : r === 'guest' ? `Room ${net.code} · ${net.count} players` : '';
+  }
+  $('mpName').value = net.name;
+  $('mpName').onchange = () => net.setName($('mpName').value);
+  $('btnHost').onclick = () => { initAudio(); play('ui'); if (net.role === 'host') net.leave(); else net.host(); showNet(); };
+  $('btnJoin').onclick = () => { initAudio(); play('ui'); if (net.role === 'guest') { net.leave(); if (state !== 'menu') G.hooks.title(); } else { net.setName($('mpName').value); net.join($('joinCode').value); } showNet(); };
+  $('joinCode').onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') $('btnJoin').click(); };
+  $('mpName').onkeydown = (e) => e.stopPropagation();
+  setInterval(showNet, 1000);
   window.addEventListener('pointerdown', () => initAudio(), { passive: true });
   // Browsers never let a page block Ctrl+W, but they do let it ask before the tab closes mid-experiment
   window.addEventListener('beforeunload', (e) => { if (state === 'play') { e.preventDefault(); e.returnValue = ''; } });
@@ -526,7 +563,7 @@ function boot() {
 
   // ---------- main loop ----------
   const dbg = { maxDt: 0.05, speed: 1, freeze: false };
-  window.__lab = { G, grab, matter, sim, gas, lab, player, input, dbg, findTarget, primary, story, startMode, selectTool: (t) => { tool = t; refreshTool(); }, state: () => state };
+  window.__lab = { G, grab, matter, sim, gas, lab, player, input, dbg, findTarget, primary, story, startMode, get net() { return net; }, selectTool: (t) => { tool = t; refreshTool(); }, state: () => state };
   let last = performance.now(), slow = 0, frames = 0;
   // one step of the whole game, without drawing it (tests call this directly to run fast)
   function step(dt) {
@@ -546,6 +583,7 @@ function boot() {
     gas.update(dt, G.time);
     lab.update(dt, G.time);
     story.update(dt);
+    net.update(dt);
     updateTweens(dt);
     G.P.update(dt);
     view.update(dt, G.time);

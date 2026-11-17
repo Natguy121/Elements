@@ -88,6 +88,7 @@ export function createMatter(G) {
   // ---------- registry ----------
   function register(it) {
     it.id = nextId++;
+    it.nid = (G.netPrefix || 'h') + it.id; // network id: the same item on every player's screen
     it.body.item = it;
     it.lastHit = 0;
     it.body.addEventListener('collide', (e) => onCollide(it, e));
@@ -110,6 +111,7 @@ export function createMatter(G) {
     play(it.sound || 'thud', pos, loud);
     if (it.body.mass > 15 && sp > 1.6) G.hooks.shake(Math.min(0.5, it.body.mass * sp * 0.0016), pos);
   }
+  function added(it) { if (G.hooks.added) G.hooks.added(it); return it; }
   function remove(it) {
     if (it.dead) return;
     it.dead = true;
@@ -117,6 +119,7 @@ export function createMatter(G) {
     scene.remove(it.group);
     if (it.extras) for (const m of it.extras) scene.remove(m);
     phys.world.removeBody(it.body);
+    if (G.hooks.removed) G.hooks.removed(it);
   }
 
   // ---------- vessels ----------
@@ -152,6 +155,8 @@ export function createMatter(G) {
       halfH: d.H / 2, pickR: Math.max(d.maxR, 0.03) + 0.015, breakV: d.breakV, sound: d.mat === 'plastic' ? 'thud' : 'clink', dirty: true, an: null,
       up: V(0, 1, 0), base: V(), foam: 0, pourAcc: 0, pourT: 0, pieceMol: {}, pieceShape: {}, air: d.air ?? 0.6, skitter: 0, flowing: 0, supply: !!o.label,
     });
+    it.spawn = { f: 'v', type, o: { label: o.label, formula: o.formula, tags: o.tags, accent: o.accent, glass: o.glass } };
+    if (G.hooks.added) G.hooks.added(it);
     return it;
   }
   function fill(it, id, mol, surf, pieceMol, shape) {
@@ -199,10 +204,11 @@ export function createMatter(G) {
     body.angularDamping = shape === 'chunk' ? 0.75 : 0.3; body.linearDamping = 0.06;
     const mix = new Mixture(o.T ?? 20);
     mix.add(id, mol, o.T ?? 20, o.surf ?? CHUNK);
-    return register({
+    return added(register({
       kind: 'lump', sub: id, shape, group, body, mix, mesh, mat, name: o.name || s.name + (shape === 'ingot' ? ' bar' : shape === 'ribbon' ? ' ribbon' : shape === 'nail' ? ' nail' : massKg > 0.02 ? ' lump' : ''),
       halfH, pickR, sound: s.look === 'metal' ? (massKg > 3 ? 'heavy' : 'metal') : 'thud', air: 1, mol0: mol, baseColor: new THREE.Color(s.color), small: massKg < 0.08,
-    });
+      spawn: { f: 'l', id, mol, o: { shape: o.shape, name: o.name, surf: o.surf } },
+    }));
   }
 
   // ---------- props ----------
@@ -232,7 +238,7 @@ export function createMatter(G) {
     group.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     const body = phys.dynamicBody(shape, d.mass, new CANNON.Vec3(0, 1, 0), d.sound === 'wood' ? phys.mats.matGround : phys.mats.matMetal);
     if (d.mass > 20) { body.angularDamping = 0.35; body.linearDamping = 0.08; }
-    return register({ kind: 'prop', type, def: d, group, body, name: d.name, halfH, pickR: Math.max(d.size[0], d.shape === 'box' ? d.size[2] : d.size[0]) * 0.7, sound: d.sound, tool: type === 'lighter' ? 'lighter' : null });
+    return added(register({ spawn: { f: 'p', type }, kind: 'prop', type, def: d, group, body, name: d.name, halfH, pickR: Math.max(d.size[0], d.shape === 'box' ? d.size[2] : d.size[0]) * 0.7, sound: d.sound, tool: type === 'lighter' ? 'lighter' : null }));
   }
 
   // ---------- breaking glass ----------

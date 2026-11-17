@@ -23,7 +23,7 @@ export function createStory(G, d) {
   const { save, persist, hud, player } = d;
   let world = null;
   const M = () => G.matter;
-  const prog = () => save.story;
+  const prog = () => (G.story ? G.prog : save.story);
 
   function ensureWorld() {
     if (world) return world;
@@ -173,7 +173,7 @@ export function createStory(G, d) {
       for (const id of it.mix.ids()) mix.add(id, it.mix.n[id], it.mix.T, SUB[id].state === 's' ? POWDER : undefined);
       play('chip', p, 0.8); chips(p, new THREE.Color(s.color).getHex(), 10);
       if (it.matId) foundMat(it.matId);
-      M().remove(it);
+      it.netCrushed = true; M().remove(it);
       M().emitParcel(mix, p.add(V(0, 0.03, 0)), V(0, -0.2, 0));
       return;
     }
@@ -259,7 +259,7 @@ export function createStory(G, d) {
   // ---------- sleeping ----------
   let sleeping = false;
   G.hooks.sleep = () => {
-    if (sleeping) return;
+    if (sleeping || G.netGuest) return;
     sleeping = true;
     const fx = document.getElementById('fxSleep');
     fx.classList.add('on'); play('heal');
@@ -275,30 +275,31 @@ export function createStory(G, d) {
 
   // ---------- start and stop ----------
   let zoneLast = '', seen = new Set(), saveT = 0, goalT = 0;
-  function start() {
+  function start(o = {}) {
     ensureWorld();
-    const p = prog();
+    // a guest plays in the host's world: their own save is not touched
+    const p = o.guest ? storyDefaults() : save.story;
+    G.netGuest = !!o.guest;
     G.story = true; G.prog = p; G.unlocked = p.unlocked;
     G.have = new Set(p.els);
     G.waterAt = world.waterLevelAt; G.groundAt = world.groundAt;
     gasMade = false; seen = new Set(); zoneLast = '';
     world.show(true);
     d.lab.setStory(true);
-    d.lab.populateStory(p.store);
-    restoreLoose();
-    stockKitchen();
-    world.spawnAll();
+    if (!o.guest) { d.lab.populateStory(p.store); restoreLoose(); stockKitchen(); world.spawnAll(); }
     const s = world.startPos;
     player.teleport(s.x, 0.35, s.z); player.yaw = s.yaw; player.pitch = -0.05;
     lastSaved = JSON.stringify([p.store, p.loose]);
-    if (!p.started) {
+    if (o.guest) hud.toast('Story Mode', 'You are in the host\'s world. Press H for goals.');
+    else if (!p.started) {
       p.started = true; persist();
       setTimeout(() => hud.toast('Story Mode', 'Morning. The science lab is up the path to the north. Take what you can carry from the kitchen.'), 600);
       setTimeout(() => hud.toast('Goals', 'Press H for your goals. Tools 6 and 7 are the rock pick and the trowel.'), 4200);
     } else hud.toast('Story Mode', `Day ${p.days || 1}. Press H for your goals.`);
   }
   function stop() {
-    if (G.story) serialize();
+    if (G.story && !G.netGuest) serialize();
+    G.netGuest = false;
     G.story = false; G.prog = save; G.unlocked = {};
     G.waterAt = null; G.groundAt = null;
     if (world) world.show(false);
@@ -313,7 +314,7 @@ export function createStory(G, d) {
       zoneLast = z;
       if (ZONE_TIPS[z] && !seen.has(z)) { seen.add(z); hud.toast(...ZONE_TIPS[z]); }
     }
-    saveT -= dt; if (saveT <= 0) { saveT = 2; serialize(); }
+    saveT -= dt; if (saveT <= 0 && !G.netGuest) { saveT = 2; serialize(); }
     goalT -= dt; if (goalT <= 0) { goalT = 0.5; checkGoals(z); }
   }
   // wipe only the story save

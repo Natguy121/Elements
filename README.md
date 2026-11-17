@@ -69,6 +69,19 @@ The rock pick also crushes lumps to powder, on the ground or inside a container.
 
 Sleeping in your bed regrows the forest and restocks the kitchen. Only findable materials are in Story Mode: nothing synthetic, radioactive or restricted.
 
+## Multiplayer
+
+On the title screen, **Host game** opens a room and shows a 5-letter code. Friends type the code and press **Join**. Then the host picks Story Mode or Normal Mode, and everyone plays in the host's world. It also works if the host starts the game first and friends join later.
+
+- Players are connected peer-to-peer over WebRTC with PeerJS. The free PeerJS cloud server only introduces players; nothing is stored there.
+- The host's game is the real one. It sends snapshots about 15 times a second. Guests send their position and whatever they hold or pour into.
+- Shared: player bodies with name tags, every object's position and contents, objects created or broken, burners, taps, the hot plate and doors.
+- Guests flip switches through the host. Only the host can restock. A guest's own saves are never touched; in Story Mode the host's save is the one that counts.
+- Not shared yet: spills on the floor, gas clouds and pour streams (each player sees their own). Voice chat is not included.
+- About 4 players works best.
+
+If a page host blocks WebRTC or the PeerJS server, serve the repository with GitHub Pages or any static host instead.
+
 ### Helpers
 
 Pick Student or Discovery on the title screen (switch any time in the pause menu):
@@ -144,7 +157,7 @@ The full design is in nine stages. Still to come:
 - Stage 4 (rest of the realism pass): volumetric fire and smoke, real refraction, a fluid simulation.
 - Stage 5: gas cylinders for H, He, N, O, Ne and Cl; electricity and electrolysis; furnace and arc furnace; the cooling room; more recipes, hazards and inventions.
 - Stage 6: the Ore Room, Air Plant, Electrolysis Hall, spectrometer and earning the first elements beyond the starting 20.
-- Stage 7: multiplayer (rooms, synced physics, shared discoveries, voice).
+- Stage 7 (rest of it): shared spills and gas, shared discoveries, voice.
 - Stage 8: platinum group, rare earths, radiochemistry, reactor, cyclotron and superheavy elements.
 - Stage 9: achievements, cosmetics, challenges, game modes, accessibility and optimisation.
 
@@ -160,6 +173,7 @@ Every locked element already has a real source mineral, a processing method and 
 | `js/physics/` | cannon-es world and the grab system |
 | `js/matter/` | Containers, lumps, props, pouring, spills, breakage (`items.js`), gas clouds and explosions (`gas.js`), and the simulation loop tying heat, reactions and effects together (`sim.js`) |
 | `js/world/` | The lab room and its fixtures, the Story Mode outdoors (`outdoors.js`), doors, and all canvas-painted textures |
+| `js/net.js` | Multiplayer: room codes, host snapshots, guest input, avatars |
 | `js/story.js`, `js/story-data.js`, `data/materials.json` | Story Mode: gathering, storage and saving, goals, unlocks, the 18 materials |
 | `js/ui/hud.js` | HUD, banners, Discovery Book, periodic table, notebook, settings |
 | `js/core/` | Input (pointer lock and touch), synthesised audio, particles |

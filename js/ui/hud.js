@@ -30,7 +30,7 @@ export function createHud(G) {
   }
   const queue = [];
   let bannerT = 0;
-  function banner(d, extra) { queue.push({ d, extra }); }
+  function banner(d, extra) { queue.push({ d, extra }); if (guideOn) { renderGuide(); const g = GUIDE[gi]; if (g && g.d === d.id) setTimeout(() => { gi = (gi + 1) % GUIDE.length; renderGuide(); }, 6000); } }
   function showBanner({ d, extra }) {
     const rare = d.rarity === 'rare' || d.rarity === 'uncommon';
     $('banner').className = 'banner' + (d.rarity === 'rare' ? ' rare' : '');
@@ -92,9 +92,35 @@ export function createHud(G) {
       return `<li><span><i style="background:${s.color}"></i>${esc(l.name)}</span><span>${liquid ? (l.g / s.density).toFixed(l.g / s.density < 10 ? 1 : 0) + ' mL' : fmtG(l.g)}</span></li>`;
     }).join('') + (it.kind === 'vessel' && !list.length ? '<li><span>Empty</span><span></span></li>' : '');
     $('heldTemp').innerHTML = showTemp ? `<span class="${T > 60 ? 'hot' : ''}">${T.toFixed(1)} °C</span>` : 'Temp: needs thermometer';
-    const pH = mix && mix.n.indicator ? mix.pH() : null;
+    const pH = mix && (studentOn || mix.ids().some((id) => SUB[id].indicator)) ? mix.pH() : null;
     $('heldPh').textContent = pH !== null && pH !== undefined ? 'pH ' + pH.toFixed(1) : '';
   }
+  let studentOn = true;
+  function setStudent(on) { if (on !== studentOn) { studentOn = on; heldKey = ''; } }
+  // ---------- experiment guide (student mode) ----------
+  const GUIDE = [
+    { d: 'rx_soda_vinegar', t: 'Fizzing volcano', s: ['Take a beaker from the left island.', 'Pour in some baking soda (the jar on the right island).', 'Pour vinegar on top (right button to pour).', 'Add dish soap first for a bigger eruption.'], w: 'Acid + carbonate makes a salt, water and carbon dioxide gas.' },
+    { d: 'obs_acid', t: 'Is it an acid?', s: ['Pour a little vinegar into an empty beaker.', 'Pick up the universal indicator dropper and tip a few drops in.', 'Red or orange means acid. Green means neutral.'], w: 'Indicators change colour with pH. Below 7 is acidic.' },
+    { d: 'rx_elephant', t: 'Elephant toothpaste', s: ['Pour hydrogen peroxide into an empty flask.', 'Add a squirt of dish soap and a drop of food colouring.', 'Use the spatula (2) to add a scoop of yeast.', 'Stand back.'], w: 'Yeast is a catalyst: it speeds up peroxide splitting into water and oxygen. Soap traps the oxygen as foam.' },
+    { d: 'obs_endpoint', t: 'Titration', s: ['Pour about 20 mL of hydrochloric acid (back bench) into a flask.', 'Add a few drops of phenolphthalein.', 'Add sodium hydroxide a little at a time with the pipette (3).', 'Stop when it turns pink: that is the endpoint.'], w: 'Acid + alkali gives salt + water. The indicator shows the moment the acid is used up.' },
+    { d: 'obs_cabbage', t: 'Cabbage rainbow', s: ['Set out a few beakers with water.', 'Add acid to one, sodium hydroxide to another, baking soda to a third.', 'Add red cabbage juice to each and compare the colours.'], w: 'Red cabbage dye changes shape, and colour, at different pH values.' },
+    { d: 'obs_cryst_cool', t: 'Grow crystals', s: ['Put a beaker of water on the hot plate and turn it to HIGH (F).', 'Stir in lots of copper sulfate until no more dissolves.', 'Move the beaker to the chiller plate and set it to COLD.', 'Press Z to speed up time and watch crystals form.'], w: 'Hot water dissolves more solid. As it cools, the extra comes out as crystals.' },
+    { d: 'rx_displace', t: 'Copper-plate a nail', s: ['Make blue copper sulfate solution in a beaker of water.', 'Use tongs (1) to drop in an iron nail.', 'Press Z to speed up time. The nail turns pink-brown.'], w: 'Iron is more reactive than copper, so it pushes copper out of the solution.' },
+    { d: 'rx_water_test', t: 'The test for water', s: ['Put copper sulfate crystals in a crucible on the tripod.', 'Light the burner under it (F) until the blue turns white.', 'Let it cool, then pipette (3) a few drops of water on it.'], w: 'White anhydrous copper sulfate turns blue again when water touches it.' },
+    { d: 'rx_na_water', t: 'Sodium in water (careful)', s: ['Half-fill a big beaker with water.', 'Use tongs (1) to take one small piece of sodium from its jar.', 'Drop it in and step back.'], w: 'Sodium is so reactive it pulls water apart, making hydrogen and an alkali.' },
+    { d: 'rx_mg_burn', t: 'Burning magnesium', s: ['Light a Bunsen burner (F).', 'With tongs (1), hold a magnesium ribbon in the flame.', 'Do not stare at the light.'], w: 'Magnesium burns with oxygen to make white magnesium oxide and a very bright light.' },
+  ];
+  let gi = 0, guideOn = false;
+  function renderGuide() {
+    const el = $('guide');
+    el.hidden = !guideOn;
+    if (!guideOn) return;
+    const g = GUIDE[gi], done = !!save.found[g.d];
+    el.innerHTML = `<div class="nav"><button type="button" class="btn small" data-g="-1" aria-label="Previous experiment">‹</button><span>Experiment ${gi + 1} of ${GUIDE.length} · H to hide</span><button type="button" class="btn small" data-g="1" aria-label="Next experiment">›</button></div>
+      <h3>${esc(g.t)}</h3>${done ? '<span class="done">Done ✓</span>' : ''}<ol>${g.s.map((x) => `<li>${esc(x)}</li>`).join('')}</ol><p class="why">${esc(g.w)}</p>`;
+  }
+  $('guide').addEventListener('click', (e) => { const b = e.target.closest('[data-g]'); if (b) { gi = (gi + +b.dataset.g + GUIDE.length) % GUIDE.length; play('ui'); renderGuide(); } });
+  function guide(on) { guideOn = on === undefined ? !guideOn : on; renderGuide(); }
   function inspect(info) {
     const el = $('inspect');
     if (!info) { el.hidden = true; return; }
@@ -138,7 +164,7 @@ export function createHud(G) {
     shown.sort((a, b) => (isFound(b) - isFound(a)) || (a.el && b.el ? a.el.z - b.el.z : 0));
     $('entries').innerHTML = shown.map((d) => {
       const f = isFound(d), rec = save.found[d.id];
-      if (!f) return `<article class="entry locked"><h4>${d.el ? esc(d.el.sym) + ' · ???' : '???'}</h4><p>${esc(d.hint || 'Not found yet.')}</p>${d.el && d.el.tier ? `<span class="who">Tier ${d.el.tier}</span>` : ''}</article>`;
+      if (!f) return `<article class="entry locked"><h4>${d.el ? esc(d.el.sym) + ' · ???' : '???'}</h4><p>${esc(G.settings.mode === 'discovery' ? 'Not found yet.' : d.hint || 'Not found yet.')}</p>${d.el && d.el.tier ? `<span class="who">Tier ${d.el.tier}</span>` : ''}</article>`;
       return `<article class="entry ${d.rarity === 'rare' ? 'rare' : ''}"><h4>${esc(d.name)}</h4>${d.kind ? `<span class="kind">${esc(d.kind)}</span>` : ''}${d.eq ? `<span class="f eq">${esc(d.eq)}</span>` : d.formula ? `<span class="f">${sub2(esc(d.formula))}</span>` : ''}<p>${esc(d.fact || '')}</p>
         <span class="who">${d.el ? 'In the store room from the start' : `Found by ${esc(rec.by)} · made ${rec.n} time${rec.n === 1 ? '' : 's'}`}</span></article>`;
     }).join('') || '<p style="color:var(--mute)">Nothing here yet.</p>';
@@ -182,11 +208,13 @@ export function createHud(G) {
   const S = G.settings;
   function loadSettings() {
     $('setSens').value = S.sens; $('setFov').value = S.fov; $('setVol').value = S.volume; $('setQuality').value = S.quality; $('setHazard').value = String(S.hazard);
-    $('setBob').checked = S.bob; $('setShake').checked = S.shake; $('setFlash').checked = S.flash; $('setVision').checked = S.labVision;
+    $('setBob').checked = S.bob; $('setShake').checked = S.shake; $('setFlash').checked = S.flash; $('setVision').checked = S.labVision; $('setMode').value = S.mode || 'student';
   }
   const bind = (id, key, conv, ev = 'input') => $(id).addEventListener(ev, () => { S[key] = conv($(id)); G.hooks.applySettings(); G.persist(); });
   bind('setSens', 'sens', (e) => +e.value); bind('setFov', 'fov', (e) => +e.value); bind('setVol', 'volume', (e) => { setVolume(+e.value); return +e.value; });
   bind('setQuality', 'quality', (e) => e.value, 'change'); bind('setHazard', 'hazard', (e) => +e.value, 'change');
+  bind('setMode', 'mode', (e) => e.value, 'change');
+  $('setMode').addEventListener('change', () => { G.hooks.modeChanged && G.hooks.modeChanged(); guide(G.settings.mode !== 'discovery'); });
   bind('setBob', 'bob', (e) => e.checked, 'change'); bind('setShake', 'shake', (e) => e.checked, 'change'); bind('setFlash', 'flash', (e) => e.checked, 'change'); bind('setVision', 'labVision', (e) => e.checked, 'change');
   $('btnResume').onclick = () => { $('pause').hidden = true; G.hooks.resume(); };
   $('btnRestock').onclick = () => { G.hooks.restock(); $('pause').hidden = true; G.hooks.resume(); };
@@ -198,7 +226,7 @@ export function createHud(G) {
   $('btnHow').onclick = () => { $('how').hidden = !$('how').hidden; play('ui'); };
 
   return {
-    toast, banner, setTarget, setPrompt, setCross, bars, setTool, setHeld, inspect, flash, hurt, frame, openBook, closeBook, openPause, loadSettings,
+    toast, banner, setTarget, setStudent, guide, renderGuide, setPrompt, setCross, bars, setTool, setHeld, inspect, flash, hurt, frame, openBook, closeBook, openPause, loadSettings,
     get bookOpen() { return !$('book').hidden; }, get pauseOpen() { return !$('pause').hidden; },
     closePause() { $('pause').hidden = true; },
     show(on) { $('hud').hidden = !on; },

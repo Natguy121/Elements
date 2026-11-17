@@ -4,7 +4,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { SUB, DISC, RXI } from './chem/db.js';
+import { SUB, DISC, RXI, RX, canReact } from './chem/db.js';
 import { ELEMENTS } from './chem/formula.js';
 import { Mixture } from './chem/mixture.js';
 import { createPhysics, G_STATIC, G_PROP } from './physics/world.js';
@@ -25,7 +25,7 @@ const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const SAVE_KEY = 'reaction-lab-save-v1';
 
 // ---------- save ----------
-const defaults = () => ({ found: {}, log: [], notes: '', settings: { sens: 1, fov: 72, volume: 0.8, quality: 'high', hazard: 1, bob: true, shake: true, flash: true, labVision: false } });
+const defaults = () => ({ found: {}, log: [], notes: '', settings: { sens: 1, fov: 72, volume: 0.8, quality: 'high', hazard: 1, bob: true, shake: true, flash: true, labVision: false, mode: 'student' } });
 let save = defaults();
 try { const raw = localStorage.getItem(SAVE_KEY); if (raw) { const o = JSON.parse(raw); save = { ...defaults(), ...o, settings: { ...defaults().settings, ...(o.settings || {}) } }; } } catch (e) { /* no storage: play without saving */ }
 let persistT = 0;
@@ -315,7 +315,7 @@ function boot() {
       if (a.pH !== null && mix.n.indicator) rows.push(['pH (indicator)', a.pH.toFixed(1)]);
     }
     rows.unshift(['Mass', hud.fmtG(it.body.mass * 1000)]);
-    rows.push(['Temperature', tool === 'thermo' && mix ? mix.T.toFixed(1) + ' °C' : mix ? 'use the thermometer (4)' : 'room']);
+    rows.push(['Temperature', (tool === 'thermo' || G.settings.mode !== 'discovery') && mix ? mix.T.toFixed(1) + ' °C' : mix ? 'use the thermometer (4)' : 'room']);
     return { name, formula, rows, tags, fact };
   }
 
@@ -359,13 +359,16 @@ function boot() {
     if (player.health < 100 && !player.dead && player.pos.distanceTo(G.firstAid) < 1.5) { player.health = Math.min(100, player.health + dt * 14); aidT -= dt; if (aidT <= 0) { aidT = 1.2; play('heal'); } }
 
     // HUD
-    const showTemp = tool === 'thermo';
+    const student = G.settings.mode !== 'discovery';
+    const showTemp = tool === 'thermo' || student;
+    hud.setStudent(student);
     if (held) {
       hud.setCross('hold');
       hud.setTarget(held.name, hud.fmtG(held.body.mass * 1000) + (grab.hold.strain > 0.8 ? ' · straining' : ''));
       const p = [['LMB', 'let go']];
       if (held.kind === 'vessel') p.push(['RMB', 'pour']); else if (held.tool === 'lighter') p.push(['RMB', 'flame']);
       p.push(['X', 'set down'], ['Wheel', 'push/pull'], ['R', 'rotate']);
+      if (student && held.mix && tg.best && tg.best.item.mix && tg.best.item !== held) { const r = reactsWith(held.mix, tg.best.item.mix); if (r) p.push(['Tip', 'these react: ' + r]); }
       hud.setPrompt(p);
       hud.setHeld(held.mix ? held : null, showTemp);
     } else if (tg.fixture) {
@@ -391,6 +394,7 @@ function boot() {
   function openBook(tab) { uiOpen = true; input.st.enabled = false; input.unlock(); hud.openBook(tab); }
   function uiKeys() {
     if (state !== 'play') return;
+    if (input.hit('KeyH') && G.settings.mode !== 'discovery' && !hud.bookOpen && !hud.pauseOpen) { hud.guide(); play('ui'); }
     if (input.hit('KeyZ') && !hud.bookOpen && !hud.pauseOpen) {
       // fast-forward chemistry and heat (not your legs): for slow reactions, cooling and crystal growing
       G.timeScale = G.timeScale === 1 ? 4 : G.timeScale === 4 ? 16 : 1;
@@ -402,13 +406,26 @@ function boot() {
     if (hud.pauseOpen) { if (esc) { hud.closePause(); G.hooks.resume(); } return; }
     if (input.hit('Tab')) openBook('disc'); else if (input.hit('KeyP')) openBook('table'); else if (input.hit('KeyN')) openBook('notes'); else if (esc) { input.unlock(); openPause(); }
   }
+  function reactsWith(a, b) {
+    for (const x of a.ids()) for (const y of b.ids()) if (x !== y && canReact(x, y)) { const rx = RX.find((r) => r.inputs.some((i) => i.id === x) && r.inputs.some((i) => i.id === y)); return rx ? rx.kind.toLowerCase() : 'yes'; }
+    return null;
+  }
+  // mode picker on the title screen
+  function showMode() {
+    document.querySelectorAll('.mode').forEach((b) => { const on = b.dataset.mode === (G.settings.mode || 'student'); b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+    document.body.classList.toggle('discovery', G.settings.mode === 'discovery');
+  }
+  document.querySelectorAll('.mode').forEach((b) => { b.onclick = () => { G.settings.mode = b.dataset.mode; persist(); play('ui'); showMode(); }; });
+  showMode();
+  G.hooks.modeChanged = showMode;
   $('btnEnter').onclick = () => {
     initAudio(); setVolume(G.settings.volume); play('ding');
     state = 'play'; $('menu').hidden = true; hud.show(true); uiOpen = false; input.st.enabled = true;
     $('touch').hidden = input.st.mode !== 'tap';
     player.teleport(0, 0.35, 3.2); player.yaw = 0; player.pitch = -0.08;
     input.lock(); refreshTool();
-    if (!save.seenIntro) { save.seenIntro = true; persist(); hud.toast('Welcome', 'Start at the right-hand bench: pour vinegar onto baking soda and see what happens.'); hud.toast('Tip', 'Hold the left mouse button to carry things. Right button pours.'); }
+    if (!save.seenIntro) { save.seenIntro = true; persist(); hud.toast('Tip', 'Hold the left mouse button to carry things. Right button pours.'); }
+    if (G.settings.mode !== 'discovery') { hud.guide(true); hud.toast('Student mode', 'Follow the experiment guide (H), or explore on your own.'); } else { hud.guide(false); hud.toast('Discovery mode', 'No hints. Use an indicator for pH and the thermometer (4) for temperature.'); }
   };
   window.addEventListener('pointerdown', () => initAudio(), { passive: true });
   // Browsers never let a page block Ctrl+W, but they do let it ask before the tab closes mid-experiment

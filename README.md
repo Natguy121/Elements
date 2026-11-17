@@ -37,6 +37,13 @@ npm run build                    # writes dist/reaction-lab.html
 | Inspect | E | Inspect button |
 | Discovery Book, periodic table, notebook | Tab, P, N | Book button |
 
+## Modes
+
+Pick one on the title screen (switch any time in the pause menu):
+
+- **Student mode** (helpers on): pH and temperature readouts without the tools, hints for undiscovered entries, a step-by-step guide with 10 experiments (H), and a tip when what you are carrying will react with what you are looking at.
+- **Discovery mode** (no helpers): no hints or guide; you measure pH with an indicator and temperature with the thermometer, like a real lab.
+
 ## What is in this build
 
 **Grabbing and carrying (R.E.P.O.-style).** Every object is a rigid body with real mass. A held object is pulled toward a point in front of you by a capped spring, so it lags, swings and collides. Heavy things sag, slow you down and drain stamina. One person can lift about 25 kg, barely; the 58 kg gas cylinder and the 92 kg drum are two-person lifts. Pick-ups lift first, then swing toward you, and the hold point stops at benches and walls. A hard knock breaks your grip.

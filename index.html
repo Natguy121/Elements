@@ -45,6 +45,7 @@
       <div class="h-foot"><span id="heldTemp"></span><span id="heldPh"></span></div>
     </div>
     <div id="inspect" class="inspect" hidden></div>
+    <aside id="guide" class="guide" hidden></aside>
     <div id="downed" class="downed" hidden><strong>Knocked out</strong><span>Coming round at the first-aid station...</span></div>
     <div id="joy" class="joy" hidden><i></i></div>
     <div id="touch" class="touch" hidden>
@@ -57,6 +58,7 @@
       <button type="button" data-hold="Space">Jump</button>
       <button type="button" data-press="Tab">Book</button>
       <button type="button" data-press="KeyZ">Time</button>
+      <button type="button" data-press="KeyH" class="stu">Guide</button>
       <button type="button" data-press="Escape">Menu</button>
     </div>
   </div>
@@ -66,6 +68,10 @@
       <p class="eyebrow">First-person chemistry sandbox · early build</p>
       <h1 class="logo">Reaction<br>Lab</h1>
       <p class="tagline">Pick things up. Pour them together. Find out.</p>
+      <div class="modes" role="radiogroup" aria-label="Mode">
+        <button type="button" class="mode" data-mode="student" role="radio"><b>Student mode</b><span>Helpers on: pH and temperature readouts, hints, a step-by-step experiment guide, and a tip when two things will react.</span></button>
+        <button type="button" class="mode" data-mode="discovery" role="radio"><b>Discovery mode</b><span>No helpers. Work it out like a real chemist: test pH with an indicator, measure with the thermometer, and find reactions yourself.</span></button>
+      </div>
       <div class="menu-actions">
         <button id="btnEnter" class="btn primary big" type="button">Enter the lab</button>
         <button id="btnHow" class="btn" type="button">Controls</button>
@@ -75,10 +81,10 @@
         <div><dt>Hands</dt><dd>Hold left mouse to grab · let go to drop, swing to throw · wheel pushes and pulls · R + mouse rotates · X sets it down gently</dd></div>
         <div><dt>Pour / use</dt><dd>Hold right mouse while holding a container to pour, or to use the tool in your hand</dd></div>
         <div><dt>Tools</dt><dd>1 tongs · 2 spatula · 3 pipette · 4 thermometer · 5 extinguisher (press again to put away)</dd></div>
-        <div><dt>Other</dt><dd>F use a switch or tap, or the torch · E inspect · Tab Discovery Book · P periodic table · N notebook · Esc menu · Z fast-forward time (×4, ×16)</dd></div>
+        <div><dt>Other</dt><dd>F use a switch or tap, or the torch · E inspect · Tab Discovery Book · P periodic table · N notebook · Esc menu · Z fast-forward time (×4, ×16) · H experiment guide (Student mode)</dd></div>
         <div><dt>Touch</dt><dd>Left thumb walks, drag to look, tap a thing to pick it up and tap again to let go</dd></div>
       </dl>
-      <p class="fine">This build covers the first three stages: the physics of grabbing and carrying, containers and pouring, and a rules-based chemistry engine with 22 reactions. All chemistry is simplified for play. It is not a guide to real procedures.</p>
+      <p class="fine">This build covers the first three stages: the physics of grabbing and carrying, containers and pouring, and a rules-based chemistry engine with 34 reactions, including acids, bases, indicators and crystals. All chemistry is simplified for play. It is not a guide to real procedures.</p>
     </div>
   </section>
 
@@ -92,6 +98,7 @@
         <label for="setQuality">Graphics</label><select id="setQuality"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="ultra">Ultra</option></select>
         <label for="setHazard">Hazard level</label><select id="setHazard"><option value="0.35">Gentle</option><option value="1">Realistic</option><option value="1.8">Chaos</option></select>
       </div>
+      <div class="set"><label for="setMode">Mode</label><select id="setMode"><option value="student">Student (helpers on)</option><option value="discovery">Discovery (no helpers)</option></select></div>
       <div class="checks">
         <label><input id="setBob" type="checkbox"> Head bob</label>
         <label><input id="setShake" type="checkbox"> Screen shake</label>

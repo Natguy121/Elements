@@ -32,6 +32,7 @@ export function stepMixture(mix, dt, env = {}) {
     if (needsAir && air <= 0) { if (latched) delete mix.burning[rx.id]; continue; }
     if (rx.requires && !rx.requires.every((r) => (mix.n[r.id] || 0) > (r.minMol || 1e-6))) continue;
     if (cond.maxTemp !== undefined && mix.T > cond.maxTemp) continue;
+    if (cond.blockedBy && cond.blockedBy.some((id) => (mix.n[id] || 0) > 1e-4)) continue; // e.g. glowing charcoal keeps copper from re-oxidising
     if (!latched) {
       if (cond.minTemp !== undefined && mix.T < cond.minTemp) continue;
       if (cond.ignition && !env.ignition) continue;
@@ -116,6 +117,7 @@ export function observe(mix) {
     if (mix.n.indicator && a.pH !== null) out.push(a.pH < 5 ? 'obs_acid' : a.pH > 9 ? 'obs_base' : a.pH > 6 && a.pH < 8 ? 'obs_neutral' : null);
     if (mix.n.phph && a.pH !== null && a.pH > 8.6) out.push('obs_phph');
     if (mix.n.cabbage && a.pH !== null && (a.pH < 3 || a.pH > 11)) out.push('obs_cabbage');
+    if (mix.dissolvedMol('berries') > 1e-4 && a.pH !== null && (a.pH < 4 || a.pH > 8)) out.push('obs_berry');
     const st = mix.grams('starch');
     if (st > 10 && st / waterG > 1.1 && st / waterG < 2.8) out.push('obs_oobleck');
   }

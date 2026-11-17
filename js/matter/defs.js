@@ -10,6 +10,8 @@ export const VESSELS = {
   dish: { name: 'Evaporating dish', prof: [[0.012, 0], [0.034, 0.01], [0.046, 0.028], [0.047, 0.03]], mat: 'ceramic', mass: 0.08, breakV: 3.4, spout: 0.03 },
   jar: { name: 'Jar', prof: [[0.036, 0], [0.039, 0.005], [0.039, 0.095], [0.034, 0.104], [0.034, 0.112]], mass: 0.2, breakV: 3.1, label: 1, spout: 0.03 },
   bottle: { name: 'Bottle', prof: [[0.036, 0], [0.039, 0.005], [0.039, 0.122], [0.014, 0.155], [0.014, 0.185]], mass: 0.26, breakV: 3.1, label: 1, spout: 0.012, air: 0.25 },
+  storejar: { name: 'Storage jar', prof: [[0.05, 0], [0.054, 0.006], [0.054, 0.15], [0.05, 0.162], [0.05, 0.172]], mass: 0.38, breakV: 3.3, label: 1, spout: 0.05 },
+  bucket: { name: 'Bucket', prof: [[0.095, 0], [0.1, 0.006], [0.125, 0.24], [0.128, 0.245]], mat: 'plastic', mass: 0.45, breakV: 99, spout: 0.08 },
   dropper: { name: 'Dropper bottle', prof: [[0.015, 0], [0.017, 0.003], [0.017, 0.05], [0.0055, 0.062], [0.0055, 0.076]], mass: 0.03, breakV: 3.2, label: 1, spout: 0.0025, air: 0.2 },
 };
 for (const d of Object.values(VESSELS)) {

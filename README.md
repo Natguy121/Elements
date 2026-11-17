@@ -32,14 +32,46 @@ npm run build                    # writes dist/reaction-lab.html
 | Rotate held object | Hold R and move the mouse | |
 | Pour / use tool | Hold right mouse | Pour / Use button |
 | Set down gently | X | Place button |
-| Tools | 1 tongs, 2 spatula, 3 pipette, 4 thermometer, 5 extinguisher | Tool button |
-| Taps, burners, hot plate, balance, restock | F while looking at them | Switch button |
+| Tools | 1 tongs, 2 spatula, 3 pipette, 4 thermometer, 5 extinguisher; Story Mode adds 6 rock pick, 7 trowel | Tool button |
+| Taps, burners, hot plate, balance, restock, doors, bed | F while looking at them | Switch button |
 | Inspect | E | Inspect button |
 | Discovery Book, periodic table, notebook | Tab, P, N | Book button |
 
-## Modes
+## Story Mode and Normal Mode
 
-Pick one on the title screen (switch any time in the pause menu):
+The title screen has two buttons:
+
+- **Normal Mode** is the free sandbox: the full lab, everything unlocked, exactly as before.
+- **Story Mode** starts you in bed at home. Everything you use, you find, carry and store yourself.
+
+### Story Mode
+
+**The map.** Your house (bed, kitchen with salt, baking soda, vinegar and sugar, a tap), a dirt path north to the science lab, and a forest around it with a stream, a lake, a cave, red rocks and a small meteorite crater. A signpost by the lab door points the way.
+
+**Gathering.** Everything is physical and carried by hand, so you make trips:
+- pick up loose things: dry sticks, charcoal at the old campfire, elderberries, gold flakes in the stream, native copper in the cave, the meteorite;
+- break samples off rock outcrops with the rock pick (6): iron ore, malachite (copper ore), limestone, and in the cave coal, sulfur, rock salt and quartz;
+- dig quartz sand on the beach and stream banks with the trowel (7);
+- fill a held container with water at the kitchen tap (F), or dip it in the stream or lake. The lab tap is shut off.
+
+The rock pick also crushes lumps to powder, on the ground or inside a container. Ores must be powdered to smelt.
+
+**Storage.** The storage room is through the door on the lab's east wall. It has one labelled jar per material and buckets for carrying. What is in those jars, and any lumps left in the lab or storage room, is saved. Nothing appears in the lab unless you bring it.
+
+**The notebook.** New materials and discoveries get a banner and a log entry. The book's Materials tab lists all 18 materials with where they are found and how much you have stored. Story Mode keeps its own discoveries, log and notes, separate from Normal Mode.
+
+**Goals and unlocks.** Press H for light goals (step outside, find something that burns, make a gas, make a natural indicator, get metal out of a rock, find gold, make quicklime, make glass...). Discoveries unlock equipment:
+- 5: heat-proof gloves (hold things up to 200 °C);
+- 10: safety goggles (less glare and blast damage);
+- 15: a big burner, hot enough for limestone, iron ore and glass.
+
+**New chemistry** for the found materials: wood burning, roasting malachite, smelting copper and iron with charcoal, burning and slaking lime, making soda glass, and an elderberry pH indicator.
+
+Sleeping in your bed regrows the forest and restocks the kitchen. Only findable materials are in Story Mode: nothing synthetic, radioactive or restricted.
+
+### Helpers
+
+Pick Student or Discovery on the title screen (switch any time in the pause menu):
 
 - **Student mode** (helpers on): pH and temperature readouts without the tools, hints for undiscovered entries, a step-by-step guide with 10 experiments (H), and a tip when what you are carrying will react with what you are looking at.
 - **Discovery mode** (no helpers): no hints or guide; you measure pH with an indicator and temperature with the thermometer, like a real lab.
@@ -62,7 +94,7 @@ Pick one on the title screen (switch any time in the pause menu):
 
 Unit tests check every reaction for atom and mass balance.
 
-22 reactions are included. Foaming reactions push foam out of the container as a rising column that topples into mounds on the bench; add dish soap for the full eruption. They include:
+Normal Mode has 34 reactions and Story Mode adds 7 more. Foaming reactions push foam out of the container as a rising column that topples into mounds on the bench; add dish soap for the full eruption. They include:
 - baking soda and vinegar
 - sodium, potassium, lithium and calcium in water
 - elephant toothpaste
@@ -127,7 +159,8 @@ Every locked element already has a real source mineral, a processing method and 
 | `js/chem/` | Formula parser, data loader, mixtures (phases, layers, solubility, pH) and the reaction engine; pure JavaScript with no graphics |
 | `js/physics/` | cannon-es world and the grab system |
 | `js/matter/` | Containers, lumps, props, pouring, spills, breakage (`items.js`), gas clouds and explosions (`gas.js`), and the simulation loop tying heat, reactions and effects together (`sim.js`) |
-| `js/world/` | The lab room and its fixtures, and all canvas-painted textures |
+| `js/world/` | The lab room and its fixtures, the Story Mode outdoors (`outdoors.js`), doors, and all canvas-painted textures |
+| `js/story.js`, `js/story-data.js`, `data/materials.json` | Story Mode: gathering, storage and saving, goals, unlocks, the 18 materials |
 | `js/ui/hud.js` | HUD, banners, Discovery Book, periodic table, notebook, settings |
 | `js/core/` | Input (pointer lock and touch), synthesised audio, particles |
 | `js/main.js` | Boot, rendering, player interaction, game loop |

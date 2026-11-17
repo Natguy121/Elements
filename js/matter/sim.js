@@ -147,6 +147,7 @@ export function createSim(G) {
       // discoveries
       progress.rx[rx.id] = (progress.rx[rx.id] || 0) + e.extent;
       if (progress.rx[rx.id] >= (rx.discoverAt ?? 2e-4)) G.hooks.discover(rx.discovery, h, rx);
+      if (G.hooks.reacted) G.hooks.reacted(rx, e);
       for (const o of rx.outputs) {
         if (!DISC['sub_' + o.id]) continue;
         progress.sub[o.id] = (progress.sub[o.id] || 0) + o.mol * e.extent;

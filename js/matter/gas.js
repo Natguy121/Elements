@@ -63,9 +63,12 @@ export function createGas(G) {
       p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
       p.r += dt * 0.05 / (1 + p.age * 0.12);
       p.T += (20 - p.T) * Math.min(1, dt * 0.7);
-      if (p.y > B.y1 - p.r * 0.5) { p.y = B.y1 - p.r * 0.5; p.vy = 0; p.r += dt * 0.04; }
-      if (p.y < p.r * 0.35) { p.y = p.r * 0.35; p.vy = 0; p.r += dt * 0.03; }
-      p.x = Math.max(B.x0 + 0.1, Math.min(B.x1 - 0.1, p.x)); p.z = Math.max(B.z0 + 0.1, Math.min(B.z1 - 0.1, p.z));
+      // indoors the ceiling and walls hold it in; outdoors (Story Mode) it is free to drift off
+      const indoors = !G.story || (p.x > B.x0 - 0.2 && p.x < B.x1 + 0.2 && p.z > B.z0 - 0.2 && p.z < B.z1 + 0.2);
+      const floorY = indoors ? 0 : G.groundAt ? G.groundAt(p.x, p.z) : 0;
+      if (indoors && p.y > B.y1 - p.r * 0.5) { p.y = B.y1 - p.r * 0.5; p.vy = 0; p.r += dt * 0.04; }
+      if (p.y < floorY + p.r * 0.35) { p.y = floorY + p.r * 0.35; p.vy = 0; p.r += dt * 0.03; }
+      if (indoors && !(G.story && p.z > B.z1 - 1.2 && p.x < B.x0 + 2.4)) { p.x = Math.max(B.x0 + 0.1, Math.min(B.x1 - 0.1, p.x)); p.z = Math.max(B.z0 + 0.1, Math.min(B.z1 - 0.1, p.z)); }
       if (p.age > 50 || (p.age > 5 && worst < 0.002 && vis < 0.02) || p.r > 2.2) { kill(i); continue; }
       if (p.sprite) {
         const s = p.sprite; s.position.set(p.x, p.y, p.z); s.scale.setScalar(p.r * 2.6);

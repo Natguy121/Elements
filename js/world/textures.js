@@ -3,15 +3,15 @@ import { ELEMENTS } from '../chem/formula.js';
 
 // Every texture is painted on a canvas at start-up: no image files to download.
 
-function cv(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; }
-function tex(c, rx = 0, ry = 0, srgb = true) {
+export function cv(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; }
+export function tex(c, rx = 0, ry = 0, srgb = true) {
   const t = new THREE.CanvasTexture(c);
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
   if (rx) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); }
   return t;
 }
-function speckle(g, w, h, n, alpha, light = 255, dark = 0, size = 2) {
+export function speckle(g, w, h, n, alpha, light = 255, dark = 0, size = 2) {
   for (let i = 0; i < n; i++) {
     const v = Math.random() < 0.5 ? light : dark;
     g.fillStyle = `rgba(${v},${v},${v},${Math.random() * alpha})`;

@@ -104,6 +104,7 @@ const S = {
   land: (k) => { noise({ dur: 0.12, vol: 0.22, f: 380 }, k); tone({ f: 90, f2: 50, dur: 0.1, vol: 0.2 }, k); },
   swish: (k) => noise({ dur: 0.25, vol: 0.14, type: 'bandpass', f: 500, f2: 1800, q: 0.9, attack: 0.1 }, k),
   beep: (k) => tone({ type: 'square', f: 1760, dur: 0.06, vol: 0.06 }, k),
+  chip: (k) => { tone({ type: 'triangle', f: 1900, f2: 1500, dur: 0.07, vol: 0.22 }, k); noise({ dur: 0.09, vol: 0.35, type: 'bandpass', f: 2600, q: 1.2 }, k); tone({ f: 140, f2: 70, dur: 0.08, vol: 0.25 }, k); },
   scoop: (k) => noise({ dur: 0.12, vol: 0.12, type: 'bandpass', f: 2400, q: 2 }, k),
   ext: (k) => noise({ dur: 0.5, vol: 0.4, type: 'highpass', f: 2200, attack: 0.03 }, k),
 };

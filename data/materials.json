@@ -1,0 +1,20 @@
+[
+{"id":"water","name":"Water","sub":"water","where":"The stream and the lake. Dip an open container in.","desc":"Clear, tasteless and the most useful solvent there is.","how":"Dip a container"},
+{"id":"salt","name":"Salt","sub":"nacl","where":"The kitchen at home, and pink rock salt in the cave.","desc":"Sodium chloride. Dissolves easily and conducts electricity in water.","how":"Kitchen or break"},
+{"id":"bakingsoda","name":"Baking soda","sub":"nahco3","where":"The kitchen at home.","desc":"Sodium bicarbonate. Fizzes with acid; turns into washing soda when heated.","how":"Kitchen"},
+{"id":"vinegar","name":"Vinegar","sub":"acetic_acid","where":"The kitchen at home.","desc":"About 5% acetic acid in water. A weak acid.","how":"Kitchen"},
+{"id":"sugar","name":"Sugar","sub":"sucrose","where":"The kitchen at home.","desc":"Sucrose. Caramelises when heated, then chars to carbon.","how":"Kitchen"},
+{"id":"sand","name":"Quartz sand","sub":"sio2","where":"Sandy banks of the stream and the lake beach.","desc":"Silicon dioxide. The main ingredient of glass.","how":"Dig"},
+{"id":"limestone","name":"Limestone","sub":"caco3","where":"The pale outcrop beside the lake.","desc":"Calcium carbonate. Fizzes in acid; turns into quicklime in great heat.","how":"Break"},
+{"id":"hematite","name":"Hematite (iron ore)","sub":"fe2o3","where":"The rusty red rocks east of the lab.","desc":"Iron oxide. Smelt it with charcoal to get iron.","how":"Break"},
+{"id":"malachite","name":"Malachite (copper ore)","sub":"malachite","where":"The green-streaked rocks north-west of the lab, near the cave.","desc":"A green copper mineral. Roast it, then smelt it with charcoal.","how":"Break"},
+{"id":"copper","name":"Native copper","sub":"copper","where":"Deep in the cave, rarely.","desc":"Pure copper metal that formed naturally in rock.","how":"Pick up"},
+{"id":"gold","name":"Gold flakes","sub":"gold","where":"Glinting in the stream bed.","desc":"Gold does not react with water or air, so it lies in streams as pure metal.","how":"Pick up"},
+{"id":"meteorite","name":"Meteorite iron","sub":"iron","where":"A small crater in the far south of the forest.","desc":"Iron and nickel that fell from space. Ancient people made tools from it.","how":"Pick up"},
+{"id":"sulfur","name":"Sulfur crystals","sub":"sulfur","where":"Around the warm vent in the cave.","desc":"Yellow crystals left by volcanic gases. Burns with a blue flame.","how":"Break"},
+{"id":"coal","name":"Coal","sub":"carbon","where":"The black seam in the cave wall.","desc":"Ancient plants turned to carbon. Burns hot.","how":"Break"},
+{"id":"charcoal","name":"Charcoal","sub":"carbon","where":"The old campfire south of the lab.","desc":"Wood heated without much air. Nearly pure carbon.","how":"Pick up"},
+{"id":"quartz","name":"Quartz crystal","sub":"sio2","where":"The glittering wall in the cave.","desc":"Silicon dioxide grown as clear crystals.","how":"Break"},
+{"id":"wood","name":"Dry wood","sub":"wood","where":"Fallen branches under the trees.","desc":"Cellulose. Fuel for fire.","how":"Pick up"},
+{"id":"berries","name":"Elderberries","sub":"berries","where":"Dark bushes on the lake shore.","desc":"Full of anthocyanin dye. Crush in water for a natural pH indicator.","how":"Pick up"}
+]

@@ -19,22 +19,26 @@ import { createMatter } from './matter/items.js';
 import { createGas } from './matter/gas.js';
 import { createSim } from './matter/sim.js';
 import { createHud, TOOLS } from './ui/hud.js';
+import { createStory, storyDefaults } from './story.js';
 
 const $ = (id) => document.getElementById(id);
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const SAVE_KEY = 'reaction-lab-save-v1';
 
 // ---------- save ----------
-const defaults = () => ({ found: {}, log: [], notes: '', settings: { sens: 1, fov: 72, volume: 0.8, quality: 'high', hazard: 1, bob: true, shake: true, flash: true, labVision: false, mode: 'student' } });
+const defaults = () => ({ found: {}, log: [], notes: '', story: storyDefaults(), settings: { sens: 1, fov: 72, volume: 0.8, quality: 'high', hazard: 1, bob: true, shake: true, flash: true, labVision: false, mode: 'student' } });
 let save = defaults();
-try { const raw = localStorage.getItem(SAVE_KEY); if (raw) { const o = JSON.parse(raw); save = { ...defaults(), ...o, settings: { ...defaults().settings, ...(o.settings || {}) } }; } } catch (e) { /* no storage: play without saving */ }
+try { const raw = localStorage.getItem(SAVE_KEY); if (raw) { const o = JSON.parse(raw); save = { ...defaults(), ...o, settings: { ...defaults().settings, ...(o.settings || {}) }, story: { ...storyDefaults(), ...(o.story || {}) } }; } } catch (e) { /* no storage: play without saving */ }
 let persistT = 0;
 const persist = () => { persistT = 1; };
 const persistNow = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* ignore */ } };
 
+const START_HAVE = ELEMENTS.filter((e) => e.start).map((e) => e.sym);
+// G.prog is the active progress: the main save in Normal Mode, save.story in Story Mode
 const G = {
-  THREE, Mixture, save, settings: save.settings, persist, time: 0, sources: [], levels: { burner: 0 }, dist: distGain,
-  timeScale: 1, have: new Set(ELEMENTS.filter((e) => e.start).map((e) => e.sym)), hooks: {}, stats: { biggest: 0, broken: 0 },
+  THREE, Mixture, save, prog: save, settings: save.settings, persist, time: 0, sources: [], levels: { burner: 0 }, dist: distGain,
+  timeScale: 1, have: new Set(START_HAVE), hooks: {}, stats: { biggest: 0, broken: 0 },
+  story: false, unlocked: {}, waterAt: null, groundAt: null,
 };
 
 function boot() {
@@ -65,6 +69,7 @@ function boot() {
   const gas = createGas(G); G.gas = gas;
   const lab = buildLab(G);
   const sim = createSim(G);
+  const story = createStory(G, { save, persist: () => persist(), hud, player, lab });
   let state = 'menu', uiOpen = false;
 
   const input = createInput(canvas, {
@@ -76,24 +81,27 @@ function boot() {
   // ---------- hooks used by the simulation ----------
   const MYSTERY_A = ['Regrettable', 'Suspicious', 'Unlabelled', 'Ominous', 'Lukewarm', 'Questionable', 'Sticky', 'Forbidden'], MYSTERY_B = ['Sludge', 'Soup', 'Gloop', 'Broth', 'Slurry', 'Cocktail', 'Paste', 'Mistake'];
   G.hooks.discover = (id, holder) => {
+    if (G.story && id.startsWith('sub_') && SUB[id.slice(4)]) story.addEl(SUB[id.slice(4)].el);
     const d = DISC[id];
     if (!d) return;
-    const rec = save.found[id];
+    const P = G.prog, rec = P.found[id];
     if (rec) { if (G.time - (rec.last || -99) > 25) { rec.n++; rec.last = G.time; persist(); } return; }
-    save.found[id] = { t: Date.now(), by: 'You', n: 1, last: G.time };
+    P.found[id] = { t: Date.now(), by: 'You', n: 1, last: G.time };
     const extra = id === 'mystery' ? `${MYSTERY_A[Math.floor(Math.random() * 8)]} ${MYSTERY_B[Math.floor(Math.random() * 8)]} No. ${1 + Math.floor(Math.random() * 98)}` : null;
     hud.banner(d, extra);
-    save.log.push({ t: Date.now(), text: `Discovered: ${extra || d.name}${holder && holder.name ? ' (in ' + holder.name.toLowerCase() + ')' : ''}.` });
-    if (save.log.length > 80) save.log.shift();
+    P.log.push({ t: Date.now(), text: `Discovered: ${extra || d.name}${holder && holder.name ? ' (in ' + holder.name.toLowerCase() + ')' : ''}.` + (G.story && d.fact ? ' ' + d.fact.split('. ')[0].replace(/\.$/, '') + '.' : '') });
+    if (P.log.length > 120) P.log.shift();
     persist();
   };
   G.hooks.log = (h, rx) => {
-    save.log.push({ t: Date.now(), text: `${rx.name} in ${(h.name || 'a spill').toLowerCase()}, starting at ${h.mix.T.toFixed(0)} °C with ${h.mix.describe(3).map((x) => hud.fmtG(x.g) + ' ' + x.name.toLowerCase()).join(', ')}.` });
-    if (save.log.length > 80) save.log.shift();
+    const P = G.prog;
+    P.log.push({ t: Date.now(), text: `${rx.name} in ${(h.name || 'a spill').toLowerCase()}, starting at ${h.mix.T.toFixed(0)} °C with ${h.mix.describe(3).map((x) => hud.fmtG(x.g) + ' ' + x.name.toLowerCase()).join(', ')}.` });
+    if (P.log.length > 120) P.log.shift();
     persist();
   };
   G.hooks.shake = (a, pos) => { const d = pos ? pos.distanceTo ? pos.distanceTo(player.pos) : Math.hypot(pos.x - player.pos.x, pos.y - player.pos.y, pos.z - player.pos.z) : 0; player.trauma = Math.min(1, Math.max(player.trauma, a / (1 + d * 0.25))); };
-  G.hooks.flash = (a) => hud.flash(a);
+  const goggles = () => G.story && G.unlocked.goggles;
+  G.hooks.flash = (a) => hud.flash(goggles() ? a * 0.4 : a);
   G.hooks.explosion = (kJ) => { G.stats.biggest = Math.max(G.stats.biggest, kJ); };
   let coughT = 0;
   G.hooks.breathe = (dose, irr) => {
@@ -101,21 +109,40 @@ function boot() {
     if (dose > 1) player.hurt(dose * 0.9 * G.settings.hazard, 'gas', G.time);
     if (G.time - coughT > 1.6) { coughT = G.time; play('cough'); hud.toast('Fumes', dose > 1 ? 'You are breathing something toxic. Get out of the cloud.' : 'That smoke stings. Step back.', 'warn'); }
   };
-  G.hooks.restock = () => { grab.release(false); matter.clearAll(); gas.clear(); lab.reset(); lab.populate(); toolLoad = new Mixture(20); play('ding'); hud.toast('Restocked', 'Fresh supplies, clean glassware.'); };
-  G.hooks.wipe = () => { save.found = {}; save.log = []; save.notes = ''; sim.progress.rx = {}; sim.progress.sub = {}; persistNow(); };
+  G.hooks.restock = () => {
+    grab.release(false); gas.clear(); lab.reset(); toolLoad = new Mixture(20); play('ding');
+    if (G.story) {
+      // Story Mode: clean glassware only. Your stored samples and what you carried in stay put.
+      for (const it of [...matter.items]) if (it.kind === 'vessel' && !it.store && !it.kitchen && it.type !== 'bucket' && it.type !== 'jar' && lab.inLab(it.body.position)) matter.remove(it);
+      lab.glassware(matter);
+      hud.toast('Restocked', 'Clean glassware. Chemicals you have to find yourself.');
+      return;
+    }
+    matter.clearAll(); lab.populate(); hud.toast('Restocked', 'Fresh supplies, clean glassware.');
+  };
+  G.hooks.wipe = () => {
+    sim.progress.rx = {}; sim.progress.sub = {};
+    if (G.story) { story.wipe(); persistNow(); worldMode = ''; startMode('story'); return; }
+    save.found = {}; save.log = []; save.notes = ''; persistNow();
+  };
   G.hooks.applySettings = applySettings;
   G.hooks.resume = () => { uiOpen = false; input.st.enabled = true; if (state === 'play') input.lock(); };
-  G.hooks.title = () => { state = 'menu'; uiOpen = false; input.st.enabled = false; input.unlock(); hud.show(false); $('menu').hidden = false; $('touch').hidden = true; };
+  G.hooks.title = () => { if (G.story) { story.serialize(); persistNow(); } showMeta(); state = 'menu'; uiOpen = false; input.st.enabled = false; input.unlock(); hud.show(false); $('menu').hidden = false; $('touch').hidden = true; };
   G.hooks.selectTool = (id) => selectTool(id);
+  { const hurt0 = player.hurt; player.hurt = (a, why, now) => hurt0(goggles() && why === 'blast' ? a * 0.6 : a, why, now); }
   player.onHurt = (amt) => { hud.hurt(Math.min(1, 0.3 + amt / 30)); };
   player.onDown = () => {
     grab.release(false); hud.downed(true); play('thud');
-    setTimeout(() => { player.dead = false; player.health = 60; player.teleport(G.firstAid.x, 0.35, G.firstAid.z); player.yaw = Math.PI; hud.downed(false); hud.toast('First aid', 'Patched up. Maybe wear goggles next time.'); }, 3200);
+    setTimeout(() => {
+      player.dead = false; player.health = 60; hud.downed(false);
+      if (G.story) { player.teleport(-16.6, 0.35, 34.2); player.yaw = -0.57; hud.toast('Home', 'You wake up in bed at home, sore. Everything you were carrying is where you dropped it.'); return; }
+      player.teleport(G.firstAid.x, 0.35, G.firstAid.z); player.yaw = Math.PI; hud.toast('First aid', 'Patched up. Maybe wear goggles next time.');
+    }, 3200);
   };
 
   // ---------- grabbing ----------
   const grab = createGrab(phys, player, camera, {
-    onGrab(it) { play('grab', it.body.position, 0.8); },
+    onGrab(it) { play('grab', it.body.position, 0.8); story.onGrab(it); },
     onRelease(it, h, knocked) { if (knocked) hud.toast('Knocked loose', 'A hard hit broke your grip.', 'warn'); else play('drop', it.body.position, 0.5); },
     onKnock() {},
     onSlip(it, why) { hud.toast('Dropped', why, 'warn'); },
@@ -158,6 +185,9 @@ function boot() {
     mk('pipette', (t) => { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.002, 0.2, 8), new THREE.MeshPhysicalMaterial({ color: 0xdff2f5, transparent: true, opacity: 0.45, roughness: 0.05 })); r.position.y = -0.1; t.add(r); const b = new THREE.Mesh(new THREE.SphereGeometry(0.014, 10, 8), new THREE.MeshStandardMaterial({ color: 0xa83a2a, roughness: 0.6 })); b.position.y = 0.01; t.add(b); });
     mk('thermo', (t) => { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.22, 6), steel); r.position.y = -0.11; t.add(r); const b = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.06, 0.012), new THREE.MeshStandardMaterial({ color: 0x1c2024, roughness: 0.5 })); b.position.y = 0.02; t.add(b); });
     mk('ext', (t) => { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.16, 12), new THREE.MeshStandardMaterial({ color: 0xb81e1a, roughness: 0.4 })); r.position.y = -0.02; r.rotation.x = 0; t.add(r); const n = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.07, 10), new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.5 })); n.position.y = -0.14; n.rotation.x = Math.PI; t.add(n); });
+    const wood = new THREE.MeshStandardMaterial({ color: 0x7b5a3a, roughness: 0.8 });
+    mk('pick', (t) => { const h = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.01, 0.3, 8), wood); h.position.y = -0.12; t.add(h); const head = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.022, 0.022), steel); head.position.set(0.03, -0.27, 0); t.add(head); const tip = new THREE.Mesh(new THREE.ConeGeometry(0.011, 0.05, 6), steel); tip.rotation.z = -Math.PI / 2; tip.position.set(0.135, -0.27, 0); t.add(tip); });
+    mk('trowel', (t) => { const h = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.1, 8), wood); h.position.y = -0.04; t.add(h); const b = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 6, 0, Math.PI, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xa8acb0, metalness: 0.9, roughness: 0.35, side: THREE.DoubleSide })); b.scale.set(0.8, 2.2, 1); b.rotation.x = Math.PI; b.position.y = -0.1; t.add(b); });
     const tether = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V(), V(0, 0, -1)]), new THREE.LineBasicMaterial({ color: 0xffe9a0, transparent: true, opacity: 0.35 }));
     tether.frustumCulled = false; g.add(tether);
     const up = V(0, 1, 0), d = V(), q = new THREE.Quaternion(), tp = V(), inv = new THREE.Matrix4();
@@ -169,9 +199,10 @@ function boot() {
       q.setFromUnitVectors(up, d.normalize()); A.a.quaternion.copy(q);
       A.sleeve.scale.y = len; A.sleeve.position.y = len / 2;
     }
-    let current = null;
+    let current = null, swingT = 0;
     return {
       setTool(id) { current = id; for (const k in tools) tools[k].visible = k === id; },
+      swing() { swingT = 0.32; },
       update(dt, t) {
         const h = grab.hold;
         let rt = R.rest, lt = L.rest, showT = false;
@@ -193,6 +224,7 @@ function boot() {
         aim(R, rt, dt); aim(L, lt, dt);
         if (h && h.tool === 'tongs') { const dd = tp.clone().sub(R.cur).normalize(); tools.tongs.quaternion.copy(R.a.quaternion).invert().multiply(q.setFromUnitVectors(V(0, -1, 0), dd)); }
         else for (const k in tools) tools[k].quaternion.identity();
+        if (swingT > 0) { swingT -= dt; const k = Math.sin(Math.max(0, swingT) / 0.32 * Math.PI); if (tools[current]) tools[current].rotation.x = -k * 1.3; } else if (tools[current]) tools[current].rotation.x = 0;
         g.visible = state === 'play' && !player.dead;
       },
     };
@@ -204,6 +236,7 @@ function boot() {
     const o = player.pos;
     const hit = phys.raycast(o.x, o.y, o.z, o.x + dir.x * maxD, o.y + dir.y * maxD, o.z + dir.z * maxD, G_STATIC | G_PROP);
     let best = null, bestScore = Infinity, wall = maxD;
+    const st = story.lookAt(o, dir, hit, maxD);
     if (hit) {
       if (hit.body.item && !hit.body.item.held) { best = { item: hit.body.item, point: V(hit.hitPointWorld.x, hit.hitPointWorld.y, hit.hitPointWorld.z), dist: hit.distance }; bestScore = hit.distance; }
       else wall = hit.distance;
@@ -221,6 +254,7 @@ function boot() {
     }
     let fixture = null, fd = 2.7;
     for (const f of G.fixtures) {
+      if (f.off && f.off()) continue;
       tmpV.copy(f.pos).sub(o);
       const t = tmpV.dot(dir);
       if (t < 0.2 || t > fd) continue;
@@ -232,8 +266,9 @@ function boot() {
       if (t < 0.2 || t > maxD) continue;
       if (Math.hypot(o.x + dir.x * t - pd.x, o.z + dir.z * t - pd.z) < pd.r + 0.02) { puddle = pd; break; }
     }
-    return { best, fixture: fixture && (!best || fd < best.dist + 0.1) ? fixture : null, puddle, wall };
+    return { best, fixture: fixture && (!best || fd < best.dist + 0.1) && (!st || fd < st.dist + 0.1) ? fixture : null, puddle, wall, story: st && (!best || st.dist < best.dist) ? st : null };
   }
+  const hotMax = () => (G.story && G.unlocked.gloves ? 200 : 75);
   const needsTongs = (it) => it.kind === 'lump' && SUB[it.sub].handle === 'tongs' && it.mix.n[it.sub] > 0;
 
   function primary(tg) {
@@ -247,6 +282,8 @@ function boot() {
       toolLoad.merge(m); holder.dirty = true; holder.changed = G.time; play('scoop'); refreshTool();
       return;
     }
+    if (tool === 'pick') { view.swing(); return story.pick(tg); }
+    if (tool === 'trowel') { if (story.dig(tg, toolLoad)) refreshTool(); return; }
     if (tool === 'pipette') {
       if (!holder) return hud.toast('Pipette', 'Point it at a liquid.');
       if (toolLoad.pourableL() > 0.0095) return hud.toast('Pipette', 'It is full. Right button squeezes it out.');
@@ -263,7 +300,7 @@ function boot() {
       return;
     }
     if (needsTongs(it)) { player.hurt(9 * G.settings.hazard, 'chem', G.time); return hud.toast('Chemical burn', `${SUB[it.sub].name} reacts with the moisture on skin. Use tongs (1).`, 'warn'); }
-    if (it.mix && it.mix.T > 70) { player.hurt(7 * G.settings.hazard, 'burn', G.time); return hud.toast('Burn', 'That is hot. It looked exactly like cold glass, which is the problem. Use tongs or wait.', 'warn'); }
+    if (it.mix && it.mix.T > hotMax() - 5) { player.hurt(7 * G.settings.hazard, 'burn', G.time); return hud.toast('Burn', 'That is hot. It looked exactly like cold glass, which is the problem. Use tongs or wait.', 'warn'); }
     grab.start(it, b.point, 'hand');
   }
   function secondary(tg, first, dt) {
@@ -271,7 +308,7 @@ function boot() {
     const ahead = () => player.pos.clone().addScaledVector(player.dir, 0.55);
     if (grab.item && grab.item.tool === 'lighter') { if (first) play('spark', grab.item.body.position); lighterOn = true; return; }
     if (grab.hold) return;
-    if (tool === 'spatula' && first && !toolLoad.isEmpty()) {
+    if ((tool === 'spatula' || tool === 'trowel') && first && !toolLoad.isEmpty()) {
       if (holder && holder.kind === 'vessel') { holder.mix.merge(toolLoad); holder.dirty = true; holder.changed = G.time; }
       else matter.emitParcel(toolLoad, ahead(), V(player.dir.x * 0.6, -0.2, player.dir.z * 0.6));
       toolLoad = new Mixture(20); play('scoop'); refreshTool();
@@ -323,8 +360,9 @@ function boot() {
   let inspecting = null, lastRmb = false, hotT = 0, aidT = 0, targetNow = null;
   function interact(dt) {
     const st = input.st;
-    for (const t of TOOLS) if (input.hit('Digit' + t.key)) selectTool(t.id);
-    if (input.hit('ToolNext')) { const i = TOOLS.findIndex((t) => t.id === tool); selectTool(i + 1 < TOOLS.length ? TOOLS[i + 1].id : TOOLS[i].id); if (i + 1 >= TOOLS.length) { tool = null; refreshTool(); } }
+    const tools = TOOLS.filter((t) => !t.story || G.story);
+    for (const t of tools) if (input.hit('Digit' + t.key)) selectTool(t.id);
+    if (input.hit('ToolNext')) { const i = tools.findIndex((t) => t.id === tool); selectTool(i + 1 < tools.length ? tools[i + 1].id : tools[i].id); if (i + 1 >= tools.length) { tool = null; refreshTool(); } }
     const tg = findTarget();
     targetNow = tg;
     const held = grab.item;
@@ -343,7 +381,7 @@ function boot() {
     if (st.rmb) secondary(tg, !lastRmb, dt);
     lastRmb = st.rmb;
     if (input.hit('KeyX')) grab.place();
-    if (input.hit('KeyF')) { if (tg.fixture) tg.fixture.use(); else { torchOn = !torchOn; torch.intensity = torchOn ? 26 : 0; play('click'); } }
+    if (input.hit('KeyF')) { if (tg.fixture) tg.fixture.use(); else if (tg.story && tg.story.water && grab.item && grab.item.kind === 'vessel') G.hooks.fillWater(tg.story.water === 'Lake' ? 'the lake' : 'the stream'); else { torchOn = !torchOn; torch.intensity = torchOn ? 26 : 0; play('click'); } }
     // E inspects whatever you hold or look at; with nothing there it leans
     const subject = grab.item || (tg.best && tg.best.item);
     if (input.hit('KeyE') || input.hit('KeyE2')) { if (inspecting) inspecting = null; else if (subject) inspecting = subject; }
@@ -353,7 +391,7 @@ function boot() {
 
     // hot things burn bare hands
     hotT -= dt;
-    if (hotT <= 0 && grab.hold && grab.hold.tool === 'hand' && grab.item.mix && grab.item.mix.T > 75) { hotT = 0.6; player.hurt(5 * G.settings.hazard, 'burn', G.time); hud.toast('Burn', 'It got too hot to hold.', 'warn'); grab.release(false); }
+    if (hotT <= 0 && grab.hold && grab.hold.tool === 'hand' && grab.item.mix && grab.item.mix.T > hotMax()) { hotT = 0.6; player.hurt(5 * G.settings.hazard, 'burn', G.time); hud.toast('Burn', 'It got too hot to hold.', 'warn'); grab.release(false); }
     if (lighterOn && G.lighterTip) G.P.emit({ pos: G.lighterTip.clone(), vel: V(0, 0.5, 0), life: 0.2, size: 0.035, size1: 0.008, color: 0xffb040, boost: 2.4, add: true, tex: 'flame' });
     // first aid
     if (player.health < 100 && !player.dead && player.pos.distanceTo(G.firstAid) < 1.5) { player.health = Math.min(100, player.health + dt * 14); aidT -= dt; if (aidT <= 0) { aidT = 1.2; play('heal'); } }
@@ -367,6 +405,7 @@ function boot() {
       hud.setTarget(held.name, hud.fmtG(held.body.mass * 1000) + (grab.hold.strain > 0.8 ? ' · straining' : ''));
       const p = [['LMB', 'let go']];
       if (held.kind === 'vessel') p.push(['RMB', 'pour']); else if (held.tool === 'lighter') p.push(['RMB', 'flame']);
+      if (held.kind === 'vessel' && (tg.story && tg.story.water || tg.fixture && tg.fixture.name === 'Kitchen tap')) p.push(['F', 'fill with water']);
       p.push(['X', 'set down'], ['Wheel', 'push/pull'], ['R', 'rotate']);
       if (student && held.mix && tg.best && tg.best.item.mix && tg.best.item !== held) { const r = reactsWith(held.mix, tg.best.item.mix); if (r) p.push(['Tip', 'these react: ' + r]); }
       hud.setPrompt(p);
@@ -379,10 +418,17 @@ function boot() {
       hud.setTarget(it.name, hud.fmtG(it.body.mass * 1000));
       const p = [];
       if (tool === 'spatula') p.push(['LMB', 'scoop'], ['RMB', 'tip out']); else if (tool === 'pipette') p.push(['LMB', 'draw up'], ['RMB', 'squeeze out']);
-      else if (tool === 'tongs') p.push(['LMB', it.kind === 'vessel' && it.mix.firstChunk() ? 'take a piece' : 'grip']); else p.push(['LMB', needsTongs(it) ? 'grab (needs tongs!)' : 'grab']);
+      else if (tool === 'tongs') p.push(['LMB', it.kind === 'vessel' && it.mix.firstChunk() ? 'take a piece' : 'grip']);
+      else if (tool === 'pick') p.push(['LMB', 'crush']); else if (tool === 'trowel') p.push(['LMB', 'scoop'], ['RMB', 'tip out']); else p.push(['LMB', needsTongs(it) ? 'grab (needs tongs!)' : 'grab']);
       p.push(['E', 'inspect']);
       hud.setPrompt(p);
       hud.setHeld(it.mix && (it.kind === 'vessel') ? it : null, showTemp);
+    } else if (tg.story && !tg.puddle) {
+      const s = tg.story;
+      hud.setHeld(null);
+      if (s.deposit) { hud.setCross('can'); hud.setTarget(s.deposit.name, s.deposit.left > 0 ? `${s.deposit.left} sample${s.deposit.left === 1 ? '' : 's'} left` : 'picked clean, regrows'); hud.setPrompt(tool === 'pick' ? [['LMB', 'strike']] : [['6', 'rock pick']]); }
+      else if (s.dig) { hud.setCross('can'); hud.setTarget(s.dig.name, 'quartz sand'); hud.setPrompt(tool === 'trowel' ? [['LMB', 'dig'], ['RMB', 'tip out']] : [['7', 'trowel']]); }
+      else { hud.setCross(''); hud.setTarget(s.water, 'water'); hud.setPrompt(grab.item && grab.item.kind === 'vessel' ? [['F', 'fill']] : []); }
     } else if (tg.puddle) {
       hud.setCross(''); hud.setTarget('Spill', ''); hud.setPrompt(tool === 'spatula' || tool === 'pipette' ? [['LMB', 'collect']] : []); hud.setHeld(tg.puddle.mix.isEmpty() ? null : { id: tg.puddle.id, name: 'Spill', mix: tg.puddle.mix, kind: 'puddle' }, showTemp);
     } else { hud.setCross(''); hud.setTarget('', ''); hud.setPrompt([]); hud.setHeld(null); }
@@ -394,7 +440,7 @@ function boot() {
   function openBook(tab) { uiOpen = true; input.st.enabled = false; input.unlock(); hud.openBook(tab); }
   function uiKeys() {
     if (state !== 'play') return;
-    if (input.hit('KeyH') && G.settings.mode !== 'discovery' && !hud.bookOpen && !hud.pauseOpen) { hud.guide(); play('ui'); }
+    if (input.hit('KeyH') && (G.story || G.settings.mode !== 'discovery') && !hud.bookOpen && !hud.pauseOpen) { hud.guide(); play('ui'); }
     if (input.hit('KeyZ') && !hud.bookOpen && !hud.pauseOpen) {
       // fast-forward chemistry and heat (not your legs): for slow reactions, cooling and crystal growing
       G.timeScale = G.timeScale === 1 ? 4 : G.timeScale === 4 ? 16 : 1;
@@ -418,18 +464,40 @@ function boot() {
   document.querySelectorAll('.mode').forEach((b) => { b.onclick = () => { G.settings.mode = b.dataset.mode; persist(); play('ui'); showMode(); }; });
   showMode();
   G.hooks.modeChanged = showMode;
-  $('btnEnter').onclick = () => {
+  // Story Mode or Normal Mode. Normal is the free sandbox exactly as before; Story builds the outdoors the first time.
+  let worldMode = 'normal';
+  function startMode(mode) {
     initAudio(); setVolume(G.settings.volume); play('ding');
+    if (mode !== worldMode) {
+      grab.release(false);
+      if (G.story) story.stop();
+      matter.clearAll(); gas.clear(); lab.reset(); toolLoad = new Mixture(20); tool = null;
+      sim.progress.rx = {}; sim.progress.sub = {};
+      G.timeScale = 1; $('timeChip').hidden = true;
+      if (mode === 'story') story.start();
+      else { G.prog = save; G.have = new Set(START_HAVE); lab.populate(); }
+      worldMode = mode;
+    }
+    hud.setStory(G.story);
     state = 'play'; $('menu').hidden = true; hud.show(true); uiOpen = false; input.st.enabled = true;
     $('touch').hidden = input.st.mode !== 'tap';
-    player.teleport(0, 0.35, 3.2); player.yaw = 0; player.pitch = -0.08;
+    if (mode === 'normal') { player.teleport(0, 0.35, 3.2); player.yaw = 0; player.pitch = -0.08; }
     input.lock(); refreshTool();
     if (!save.seenIntro) { save.seenIntro = true; persist(); hud.toast('Tip', 'Hold the left mouse button to carry things. Right button pours.'); }
+    if (G.story) { hud.guide(true); return; }
     if (G.settings.mode !== 'discovery') { hud.guide(true); hud.toast('Student mode', 'Follow the experiment guide (H), or explore on your own.'); } else { hud.guide(false); hud.toast('Discovery mode', 'No hints. Use an indicator for pH and the thermometer (4) for temperature.'); }
-  };
+  }
+  function showMeta() {
+    const p = save.story, n = Object.keys(p.mats).length, f = Object.keys(p.found).length;
+    $('storyMeta').textContent = p.started ? `Continue · day ${p.days || 1} · ${n} material${n === 1 ? '' : 's'} · ${f} discover${f === 1 ? 'y' : 'ies'}` : 'New game';
+  }
+  showMeta();
+  $('btnStory').onclick = () => startMode('story');
+  $('btnNormal').onclick = () => startMode('normal');
   window.addEventListener('pointerdown', () => initAudio(), { passive: true });
   // Browsers never let a page block Ctrl+W, but they do let it ask before the tab closes mid-experiment
   window.addEventListener('beforeunload', (e) => { if (state === 'play') { e.preventDefault(); e.returnValue = ''; } });
+  window.addEventListener('pagehide', () => { if (G.story) story.serialize(); persistNow(); });
 
   // ---------- settings and resize ----------
   let pr = 1, scale = 1;
@@ -458,7 +526,7 @@ function boot() {
 
   // ---------- main loop ----------
   const dbg = { maxDt: 0.05, speed: 1, freeze: false };
-  window.__lab = { G, grab, matter, sim, gas, lab, player, input, dbg, findTarget, primary, selectTool: (t) => { tool = t; refreshTool(); }, state: () => state };
+  window.__lab = { G, grab, matter, sim, gas, lab, player, input, dbg, findTarget, primary, story, startMode, selectTool: (t) => { tool = t; refreshTool(); }, state: () => state };
   let last = performance.now(), slow = 0, frames = 0;
   // one step of the whole game, without drawing it (tests call this directly to run fast)
   function step(dt) {
@@ -477,6 +545,7 @@ function boot() {
     sim.update(dt);
     gas.update(dt, G.time);
     lab.update(dt, G.time);
+    story.update(dt);
     updateTweens(dt);
     G.P.update(dt);
     view.update(dt, G.time);
@@ -494,7 +563,7 @@ function boot() {
     for (const it of matter.items) if (it.flowing > 0) pour = Math.max(pour, Math.min(1, it.flowing * 30) * distGain(it.body.position));
     loopVol('pour', pour * 0.16, 1); loopVol('fizz', sim.levels.fizz * 0.5); loopVol('flame', sim.levels.flame * 0.5); loopVol('burner', G.levels.burner);
     loopVol('tap', G.tap.on ? 0.09 * distGain(lab.spout) : 0); loopVol('hum', state === 'play' ? 0.035 : 0.02);
-    hud.frame(Math.min(raw, 0.1), state === 'play' ? sim.glare : 0, player.blur);
+    hud.frame(Math.min(raw, 0.1), state === 'play' ? sim.glare * (goggles() ? 0.4 : 1) : 0, player.blur);
     if (bloom.enabled) composer.render(); else renderer.render(scene, camera);
     input.endFrame();
     // if the machine is struggling, give up sharpness before frame rate

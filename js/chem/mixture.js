@@ -103,7 +103,7 @@ export class Mixture {
       }
       // solid powder
       const d = this.dissolvedMol(id), rest = n - d;
-      if (d > 0) { L.aq += d * s.M / s.density / 1000 * 0.55; if (s.tint) mix('aq', s.color, d * s.M / 1000 * s.tint, 0.9); }
+      if (d > 0) { L.aq += d * s.M / s.density / 1000 * 0.55; if (s.indicator) inds[s.indicator] = (inds[s.indicator] || 0) + d * s.M / s.density / 1000; else if (s.tint) mix('aq', s.color, d * s.M / 1000 * s.tint, 0.9); }
       if (rest > 1e-7 && this.xt[id] && this.n.water) { crystals.push({ id, mol: rest, vol: rest * s.M / s.density / 1000 }); continue; }
       if (rest > 1e-7) {
         const v = rest * s.M / s.density / 1000 / 0.62; // loose packing

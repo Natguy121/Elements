@@ -20,6 +20,7 @@
   <div id="fxBlur" class="fx" aria-hidden="true"></div>
   <div id="fxHurt" class="fx" aria-hidden="true"></div>
   <div id="fxFlash" class="fx" aria-hidden="true"></div>
+  <div id="fxSleep" class="fx sleep" aria-hidden="true"></div>
 
   <div id="hud" hidden>
     <div id="cross" class="cross"></div>
@@ -59,6 +60,7 @@
       <button type="button" data-press="Tab">Book</button>
       <button type="button" data-press="KeyZ">Time</button>
       <button type="button" data-press="KeyH" class="stu">Guide</button>
+      <button type="button" data-press="KeyH" class="story-only">Goals</button>
       <button type="button" data-press="Escape">Menu</button>
     </div>
   </div>
@@ -68,23 +70,28 @@
       <p class="eyebrow">First-person chemistry sandbox · early build</p>
       <h1 class="logo">Reaction<br>Lab</h1>
       <p class="tagline">Pick things up. Pour them together. Find out.</p>
-      <div class="modes" role="radiogroup" aria-label="Mode">
-        <button type="button" class="mode" data-mode="student" role="radio"><b>Student mode</b><span>Helpers on: pH and temperature readouts, hints, a step-by-step experiment guide, and a tip when two things will react.</span></button>
-        <button type="button" class="mode" data-mode="discovery" role="radio"><b>Discovery mode</b><span>No helpers. Work it out like a real chemist: test pH with an indicator, measure with the thermometer, and find reactions yourself.</span></button>
+      <div class="start">
+        <button id="btnStory" class="start-btn story" type="button"><b>Story Mode</b><span>Wake up at home, walk to the lab and explore the forest, stream and cave. Gather what you find, carry it back, store it and work out what it makes.</span><em id="storyMeta"></em></button>
+        <button id="btnNormal" class="start-btn" type="button"><b>Normal Mode</b><span>The full lab with everything unlocked. A free sandbox.</span></button>
       </div>
-      <div class="menu-actions">
-        <button id="btnEnter" class="btn primary big" type="button">Enter the lab</button>
-        <button id="btnHow" class="btn" type="button">Controls</button>
+      <div class="helpers">
+        <span class="h-label" id="helpLabel">Helpers</span>
+        <div class="modes" role="radiogroup" aria-labelledby="helpLabel">
+          <button type="button" class="mode" data-mode="student" role="radio" title="pH and temperature readouts, hints, a step-by-step experiment guide, and a tip when two things will react"><b>Student</b><span>readouts and hints</span></button>
+          <button type="button" class="mode" data-mode="discovery" role="radio" title="No helpers: test pH with an indicator, measure with the thermometer"><b>Discovery</b><span>no helpers</span></button>
+        </div>
+        <button id="btnHow" class="btn small" type="button">Controls</button>
       </div>
       <dl id="how" class="how" hidden>
         <div><dt>Move</dt><dd>W A S D · Shift sprint · Space jump · C crouch · Q / E lean</dd></div>
         <div><dt>Hands</dt><dd>Hold left mouse to grab · let go to drop, swing to throw · wheel pushes and pulls · R + mouse rotates · X sets it down gently</dd></div>
         <div><dt>Pour / use</dt><dd>Hold right mouse while holding a container to pour, or to use the tool in your hand</dd></div>
-        <div><dt>Tools</dt><dd>1 tongs · 2 spatula · 3 pipette · 4 thermometer · 5 extinguisher (press again to put away)</dd></div>
+        <div><dt>Tools</dt><dd>1 tongs · 2 spatula · 3 pipette · 4 thermometer · 5 extinguisher · Story Mode: 6 rock pick (break off samples, crush lumps to powder) · 7 trowel (dig sand) · press again to put away</dd></div>
+        <div><dt>Story</dt><dd>F opens doors, sleeps in your bed and fills a held container at a tap, the stream or the lake · H goals · the Materials tab in the book lists what you have found</dd></div>
         <div><dt>Other</dt><dd>F use a switch or tap, or the torch · E inspect · Tab Discovery Book · P periodic table · N notebook · Esc menu · Z fast-forward time (×4, ×16) · H experiment guide (Student mode)</dd></div>
         <div><dt>Touch</dt><dd>Left thumb walks, drag to look, tap a thing to pick it up and tap again to let go</dd></div>
       </dl>
-      <p class="fine">This build covers the first three stages: the physics of grabbing and carrying, containers and pouring, and a rules-based chemistry engine with 34 reactions, including acids, bases, indicators and crystals. All chemistry is simplified for play. It is not a guide to real procedures.</p>
+      <p class="fine">Physics of grabbing and carrying, containers and pouring, and a rules-based chemistry engine with 41 reactions, including acids, bases, indicators, crystals, smelting and glassmaking. All chemistry is simplified for play. It is not a guide to real procedures.</p>
     </div>
   </section>
 
@@ -111,7 +118,7 @@
         <button id="btnWipe" class="btn" type="button">Erase discoveries</button>
         <button id="btnTitle" class="btn" type="button">Title screen</button>
       </div>
-      <p id="wipeAsk" class="ask" hidden>Erase every discovery and note? <button id="wipeYes" class="btn small danger" type="button">Erase</button> <button id="wipeNo" class="btn small" type="button">Keep</button></p>
+      <p id="wipeAsk" class="ask" hidden><span id="wipeAskText">Erase every discovery and note?</span> <button id="wipeYes" class="btn small danger" type="button">Erase</button> <button id="wipeNo" class="btn small" type="button">Keep</button></p>
     </div>
   </section>
 
@@ -122,6 +129,7 @@
           <button type="button" data-tab="disc" class="on">Discovery Book</button>
           <button type="button" data-tab="table">Periodic table</button>
           <button type="button" data-tab="notes">Notebook</button>
+          <button type="button" data-tab="mats" class="story-only">Materials</button>
         </nav>
         <span id="bookCount" class="count"></span>
         <button id="bookClose" class="btn small" type="button">Close</button>
@@ -133,6 +141,9 @@
       <div id="tab-table" class="tabpane" hidden>
         <div class="pt-scroll"><div id="pt" class="pt"></div></div>
         <aside id="ptInfo" class="pt-info"></aside>
+      </div>
+      <div id="tab-mats" class="tabpane" hidden>
+        <div class="entries-wrap"><div id="matList" class="entries"></div></div>
       </div>
       <div id="tab-notes" class="tabpane" hidden>
         <div class="notes-col"><h3>Experiment log</h3><ol id="log" class="log"></ol></div>

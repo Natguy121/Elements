@@ -3,6 +3,8 @@ import * as T from './textures.js';
 import { SUB } from '../chem/db.js';
 import { CHUNK } from '../chem/mixture.js';
 import { play } from '../core/audio.js';
+import { solidBox, makeDoor } from './door.js';
+import { MATS } from '../story-data.js';
 
 // The main lab floor: one room for now (the rest of the complex comes in later stages).
 // Builds what you see, the matching collision boxes, the working fixtures, and stocks the shelves.
@@ -49,7 +51,13 @@ export function buildLab(G) {
   phys.staticBox(0, -0.5, 0, 16, 1, 12);
   const ceil = mesh(new THREE.PlaneGeometry(14, 10), M.ceil, 0, H, 0, false); ceil.rotation.x = Math.PI / 2;
   phys.staticBox(0, H + 0.5, 0, 16, 1, 12);
-  [[0, Z0 - 0.15, 14.6, 0.3], [0, Z1 + 0.15, 14.6, 0.3], [X0 - 0.15, 0, 0.3, 10.6], [X1 + 0.15, 0, 0.3, 10.6]].forEach(([x, z, w, d]) => block(w, H, d, M.wall, x, H / 2, z));
+  [[0, Z0 - 0.15, 14.6, 0.3], [X0 - 0.15, 0, 0.3, 10.6]].forEach(([x, z, w, d]) => block(w, H, d, M.wall, x, H / 2, z));
+  // south wall, with the doorway out (Story Mode) at x = -5.4
+  block(1.4, H, 0.3, M.wall, -6.6, H / 2, Z1 + 0.15); block(12.2, H, 0.3, M.wall, 1.2, H / 2, Z1 + 0.15); block(1.0, H - 2.1, 0.3, M.wall, -5.4, 2.1 + (H - 2.1) / 2, Z1 + 0.15);
+  // east wall: whole in Normal Mode; in Story Mode it has a door to the storage room at z = 1.6
+  const eastFull = { mesh: deco(0.3, H, 10.6, M.wall, X1 + 0.15, H / 2, 0), body: solidBox(phys, X1 + 0.15, H / 2, 0, 0.3, H, 10.6) };
+  const eastSplit = [[-2.1, 6.4, H / 2, H], [3.7, 3.2, H / 2, H], [1.6, 1.0, 2.1 + (H - 2.1) / 2, H - 2.1]].map(([z, d, y, h]) => ({ mesh: deco(0.3, h, d, M.wall, X1 + 0.15, y, z), body: solidBox(phys, X1 + 0.15, y, z, 0.3, h, d, 0, false) }));
+  for (const e of eastSplit) e.mesh.visible = false;
   // tiled splashback along the north wall, skirting, ceiling lights
   deco(14, 1.1, 0.02, M.tile, 0, 1.45, Z0 + 0.012);
   [[0, Z0 + 0.02, 14, 0.03], [0, Z1 - 0.02, 14, 0.03]].forEach(([x, z, w, d]) => deco(w, 0.1, d, M.dark, x, 0.05, z));
@@ -114,7 +122,7 @@ export function buildLab(G) {
   const spout = V(sx, BENCH + 0.25, NZ0 + 0.32);
   G.drains.push({ x0: sx - 0.45, x1: sx + 0.45, z0: sz - 0.3, z1: sz + 0.3, y: BENCH - 0.2 });
   const tap = { on: false, acc: 0 };
-  fixtures.push({ pos: V(sx + 0.12, BENCH + 0.06, NZ0 + 0.12), r: 0.14, name: 'Cold tap', hint: () => (tap.on ? 'Turn off the water' : 'Turn on the water'), use: () => { tap.on = !tap.on; tapKnob.rotation.y += 1.2; play('click', spout); } });
+  fixtures.push({ pos: V(sx + 0.12, BENCH + 0.06, NZ0 + 0.12), r: 0.14, name: 'Cold tap', hint: () => (G.story ? 'The water is shut off' : tap.on ? 'Turn off the water' : 'Turn on the water'), use: () => { if (G.story) { play('click', spout); G.hud.toast('Cold tap', 'The lab water is shut off. Bring water from home, the stream or the lake.'); return; } tap.on = !tap.on; tapKnob.rotation.y += 1.2; play('click', spout); } });
   updaters.push((dt) => {
     if (!tap.on) return;
     tap.acc += dt * 0.045; // litres per second
@@ -157,7 +165,8 @@ export function buildLab(G) {
     let any = 0;
     for (const b of burners) {
       if (!b.on) { b.light.intensity = 0; continue; }
-      b.fl.scale.set(1 + Math.sin(t * 31) * 0.05, 1 + Math.sin(t * 23) * 0.07 + Math.sin(t * 7.1) * 0.04, 1 + Math.cos(t * 29) * 0.05);
+      const big = G.story && G.unlocked && G.unlocked.burner ? 1.6 : 1;
+      b.fl.scale.set((1 + Math.sin(t * 31) * 0.05) * big, (1 + Math.sin(t * 23) * 0.07 + Math.sin(t * 7.1) * 0.04) * big, (1 + Math.cos(t * 29) * 0.05) * big);
       b.light.intensity = 0.7 + Math.sin(t * 19) * 0.08;
       any = Math.max(any, G.dist(b.pos));
     }
@@ -260,12 +269,37 @@ export function buildLab(G) {
   block(0.5, 0.6, 0.16, M.white, 4.2, 1.45, Z1 - 0.08);
   mesh(new THREE.PlaneGeometry(0.34, 0.34), std({ map: T.signTex(['+'], '#1f8a4c', '#ffffff', 256, 256, false), roughness: 0.5 }), 4.2, 1.45, Z1 - 0.165, false).rotation.y = Math.PI;
   G.firstAid = V(4.2, 1.2, Z1 - 0.5);
-  // door (decor)
-  deco(1.0, 2.1, 0.06, std({ color: 0x66757c, roughness: 0.45 }), -5.4, 1.05, Z1 - 0.03);
-  deco(1.16, 2.2, 0.04, M.darkSteel, -5.4, 1.1, Z1 - 0.012);
-  deco(0.3, 0.45, 0.065, std({ color: 0x0c1418, roughness: 0.05, metalness: 0.6 }), -5.4, 1.55, Z1 - 0.03);
-  deco(0.14, 0.025, 0.05, M.steel, -5.0, 1.02, Z1 - 0.07);
-  mesh(new THREE.PlaneGeometry(0.8, 0.2), new THREE.MeshBasicMaterial({ map: T.signTex(['MORE ROOMS SOON'], '#06140c', '#43ff8a', 512, 128, false) }), -5.4, 2.33, Z1 - 0.04, false).rotation.y = Math.PI;
+  // the door out: locked in Normal Mode, the way to the forest in Story Mode
+  deco(0.06, 2.16, 0.32, M.darkSteel, -5.93, 1.08, Z1 + 0.15); deco(0.06, 2.16, 0.32, M.darkSteel, -4.87, 1.08, Z1 + 0.15); deco(1.12, 0.06, 0.32, M.darkSteel, -5.4, 2.13, Z1 + 0.15);
+  const door = makeDoor(G, { x: -5.9, z: Z1 + 0.15, a0: 0, a1: -Math.PI / 2 * 0.92, mat: std({ color: 0x66757c, roughness: 0.45 }), window: true, name: 'Lab door', canUse: () => (G.story ? true : 'Locked. Outside is Story Mode.') });
+  fixtures.push(door.fixture);
+  const soonSign = mesh(new THREE.PlaneGeometry(0.8, 0.2), new THREE.MeshBasicMaterial({ map: T.signTex(['MORE ROOMS SOON'], '#06140c', '#43ff8a', 512, 128, false) }), -5.4, 2.33, Z1 - 0.04, false); soonSign.rotation.y = Math.PI;
+  const exitSign = mesh(new THREE.PlaneGeometry(0.8, 0.2), new THREE.MeshBasicMaterial({ map: T.signTex(['WAY OUT  >'], '#06140c', '#43ff8a', 512, 128, false) }), -5.4, 2.33, Z1 - 0.04, false); exitSign.rotation.y = Math.PI; exitSign.visible = false;
+
+  // ---------- storage room (Story Mode): behind the east wall ----------
+  const SX0 = X1 + 0.3, SX1 = 11.0, SZ0 = 0, SZ1 = 5.0;
+  const annex = new THREE.Group(); scene.add(annex); annex.visible = false;
+  const am = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; annex.add(m); return m; };
+  { const f = am(new THREE.PlaneGeometry(SX1 - SX0, SZ1 - SZ0), M.floor, (SX0 + SX1) / 2, 0.001, (SZ0 + SZ1) / 2); f.rotation.x = -Math.PI / 2; f.castShadow = false; }
+  { const c = am(new THREE.PlaneGeometry(SX1 - SX0, SZ1 - SZ0), M.ceil, (SX0 + SX1) / 2, H, (SZ0 + SZ1) / 2); c.rotation.x = Math.PI / 2; }
+  phys.staticBox((SX0 + SX1) / 2, -0.5, (SZ0 + SZ1) / 2, SX1 - SX0 + 0.4, 1, SZ1 - SZ0 + 0.4);
+  for (const [x, z, w, d] of [[(SX0 + SX1 + 0.3) / 2, SZ0 - 0.15, SX1 - SX0 + 0.6, 0.3], [(SX0 + SX1 + 0.3) / 2, SZ1 + 0.15, SX1 - SX0 + 0.6, 0.3], [SX1 + 0.15, (SZ0 + SZ1) / 2, 0.3, SZ1 - SZ0 + 0.6]]) { am(new THREE.BoxGeometry(w, H, d), M.wall, x, H / 2, z); phys.staticBox(x, H / 2, z, w, H, d); }
+  am(new THREE.BoxGeometry(1.4, 0.02, 0.42), M.panel, (SX0 + SX1) / 2, H - 0.05, 2.5).castShadow = false;
+  { const before = scene.children.length; shelving(SX1, 0.2, 4.8, [0.42, 0.95, 1.46, 1.98], -1); for (const o of scene.children.slice(before)) annex.attach(o); }
+  const annexLight = new THREE.PointLight(0xfff1de, 12, 10, 2); annexLight.position.set((SX0 + SX1) / 2, H - 0.3, 2.5); annex.add(annexLight);
+  { const sg = am(new THREE.PlaneGeometry(1.2, 0.26), std({ map: T.signTex(['STORAGE ROOM'], '#12202b', '#e8ecec', 640, 140, false), roughness: 0.6 }), X1 - 0.012, 2.4, 1.6); sg.rotation.y = -Math.PI / 2; sg.castShadow = false; }
+  { const sg = am(new THREE.PlaneGeometry(2.4, 0.4), std({ map: T.signTex(['SAMPLE STORAGE'], '#12202b', '#e8ecec', 1024, 170, false), roughness: 0.6 }), SX1 - 0.012, 2.55, 2.5); sg.rotation.y = -Math.PI / 2; sg.castShadow = false; }
+  const annexDoor = makeDoor(G, { x: X1 + 0.15, z: 1.1, a0: -Math.PI / 2, a1: -0.15, mat: std({ color: 0x66757c, roughness: 0.45 }), name: 'Storage room door' });
+  annexDoor.show(false); annexDoor.fixture.off = () => !G.story;
+  fixtures.push(annexDoor.fixture);
+  function setStory(on) {
+    eastFull.mesh.visible = !on; for (const e of eastSplit) e.mesh.visible = on;
+    if (on) { phys.world.removeBody(eastFull.body); for (const e of eastSplit) phys.world.addBody(e.body); }
+    else { for (const e of eastSplit) phys.world.removeBody(e.body); if (!phys.world.bodies.includes(eastFull.body)) phys.world.addBody(eastFull.body); }
+    annex.visible = on; annexDoor.show(on); soonSign.visible = !on; exitSign.visible = on;
+    door.set(false); annexDoor.set(false);
+  }
+  updaters.push((dt) => { door.update(dt); annexDoor.update(dt); });
   // restock lever on the west wall
   const rs = V(X0 + 0.06, 1.25, 3.6);
   deco(0.08, 0.3, 0.2, M.darkSteel, rs.x, rs.y, rs.z);
@@ -375,8 +409,43 @@ export function buildLab(G) {
     m.place(m.makeProp('gascyl'), 6.4, 0, 4.2); m.place(m.makeProp('barrel'), 5.5, 0, 4.2);
   }
 
-  G.fixtureSources = (arr) => { for (const b of burners) if (b.on) arr.push({ pos: b.pos, r: 0.07, T: 1500, k: 0.5, flame: true }); G.extraSources(arr); };
-  function reset() { tap.on = false; for (const b of burners) { b.on = false; b.fl.visible = false; } plate.set = 0; pan.tare = 0; }
+  // Story Mode's big-burner upgrade burns hotter (a gas-air blowtorch rather than a Bunsen)
+  // Story Mode: equipment and empty glassware only. Chemicals come from outside.
+  function glassware(m) {
+    const A = BENCH;
+    [[-3.25, -0.3], [-2.95, -0.3], [-2.65, -0.3], [-2.35, -0.3]].forEach(([x, z]) => m.place(m.makeVessel('beaker250'), x, A, z));
+    m.place(m.makeVessel('beaker600'), -1.85, A, -0.3); m.place(m.makeVessel('beaker600'), -1.45, A, -0.3);
+    m.place(m.makeVessel('flask250'), -3.2, A, 0.28); m.place(m.makeVessel('flask250'), -2.85, A, 0.28);
+    m.place(m.makeVessel('cylinder100'), -2.5, A, 0.3);
+    m.place(m.makeVessel('crucible'), -2.15, A, 0.3); m.place(m.makeVessel('crucible'), -1.95, A, 0.3);
+    m.place(m.makeVessel('dish'), -1.6, A, 0.3);
+    for (const [x, z] of [[1.0, -0.3], [1.35, -0.3], [1.7, -0.3], [2.05, -0.3]]) m.place(m.makeVessel('beaker250'), x, A, z);
+    m.place(m.makeVessel('beaker600'), 2.5, A, -0.3); m.place(m.makeVessel('flask250'), 2.9, A, -0.3);
+    m.place(m.makeVessel('crucible'), 1.0, A, 0.3); m.place(m.makeVessel('crucible'), 1.25, A, 0.3); m.place(m.makeVessel('dish'), 1.6, A, 0.3);
+    let gz = -2.9;
+    for (const t of ['beaker250', 'beaker250', 'beaker250', 'beaker600', 'flask250', 'flask250', 'cylinder100', 'crucible', 'dish', 'beaker250']) { m.place(m.makeVessel(t), glassX - 0.02, 0.95, gz); gz += 0.38; }
+  }
+  function populateStory(store) {
+    const m = mat();
+    G.stocked = new Set();
+    glassware(m);
+    m.place(m.makeProp('lighter'), -2.9, BENCH + 0.1, NZ0 + 0.5);
+    for (let i = 0; i < 6; i++) m.place(m.makeVessel('jar'), storeX + 0.02, 0.95, -3.2 + i * 0.4);
+    // the storage room: one labelled jar per material, plus buckets for carrying
+    const sx = SX1 - 0.24;
+    MATS.forEach((mt, i) => {
+      const s = SUB[mt.sub], y = i < 9 ? 1.46 : 0.95, z = 0.45 + (i % 9) * 0.5;
+      const it = m.makeVessel('storejar', { label: mt.name, formula: s.formula || '', tags: [...(s.tags || [])].filter((t) => t !== 'flammable' || mt.sub !== 'wood'), accent: s.color });
+      it.store = mt.id;
+      const saved = store && store[mt.id];
+      if (saved) for (const id in saved.n) { m.fill(it, id, saved.n[id], saved.surf[id]); if (saved.piece && saved.piece[id]) { it.pieceMol[id] = saved.piece[id]; it.pieceShape[id] = saved.shape && saved.shape[id] || 'chunk'; } }
+      m.place(it, sx, y, z, -Math.PI / 2);
+    });
+    m.place(m.makeVessel('bucket'), 8.2, 0, 4.3); m.place(m.makeVessel('bucket'), 8.6, 0, 3.6);
+    m.place(m.makeVessel('bucket'), -4.6, 0, 4.4);
+  }
+  G.fixtureSources = (arr) => { const big = G.story && G.unlocked && G.unlocked.burner; for (const b of burners) if (b.on) arr.push({ pos: b.pos, r: big ? 0.09 : 0.07, T: big ? 2000 : 1500, k: big ? 1.4 : 0.5, flame: true }); G.extraSources(arr); };
+  function reset() { tap.on = false; G.tap.on = false; for (const b of burners) { b.on = false; b.fl.visible = false; } plate.set = 0; pan.tare = 0; }
   function update(dt, t) { for (const u of updaters) u(dt, t); }
-  return { populate, update, reset, M, burners, plate, tap, spout };
+  return { populate, populateStory, glassware, setStory, update, reset, M, burners, plate, tap, spout, door, annexDoor, inLab: (p) => p.x > X0 && p.x < X1 && p.z > Z0 && p.z < Z1 };
 }

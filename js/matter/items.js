@@ -38,6 +38,7 @@ export function createMatter(G) {
     drum: new THREE.MeshPhysicalMaterial({ color: 0x2f5a78, metalness: 0.7, roughness: 0.42, clearcoat: 0.2 }),
     brass: new THREE.MeshStandardMaterial({ color: 0xcfa640, metalness: 1, roughness: 0.3 }),
     black: new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.5 }),
+    plastic: new THREE.MeshStandardMaterial({ color: 0x2f6fb0, roughness: 0.45, side: THREE.DoubleSide }),
   };
   // Glass is see-through face-on and reflective toward its edges (Fresnel). Doing this in the shader
   // stops empty glassware reading as frosted grey cups against the dark bench.
@@ -122,8 +123,8 @@ export function createMatter(G) {
   function makeVessel(type, o = {}) {
     const d = VESSELS[type], g = vesselGeo(type);
     const group = new THREE.Group();
-    const wallMat = d.mat === 'ceramic' ? M.ceramic : o.glass === 'amber' ? M.amber : M.glass;
-    const shell = new THREE.Mesh(g.outer, wallMat); shell.renderOrder = 3; shell.castShadow = d.mat === 'ceramic'; group.add(shell);
+    const wallMat = d.mat === 'ceramic' ? M.ceramic : d.mat === 'plastic' ? M.plastic : o.glass === 'amber' ? M.amber : M.glass;
+    const shell = new THREE.Mesh(g.outer, wallMat); shell.renderOrder = 3; shell.castShadow = d.mat === 'ceramic' || d.mat === 'plastic'; group.add(shell);
     const rim = new THREE.Mesh(g.rim, wallMat); rim.rotation.x = Math.PI / 2; rim.position.y = d.H; rim.renderOrder = 3; group.add(rim);
     const layers = [];
     for (let i = 0; i < 4; i++) {
@@ -143,12 +144,12 @@ export function createMatter(G) {
       label.position.y = d.prof[1][1] + h / 2 + 0.012; label.renderOrder = 4;
       group.add(label);
     }
-    const body = phys.dynamicBody(new CANNON.Cylinder(Math.max(d.prof[d.prof.length - 1][0], d.maxR * 0.6), d.prof[1][0], d.H, 10), d.mass, new CANNON.Vec3(0, 1, 0), d.mat === 'ceramic' ? phys.mats.matGround : phys.mats.matGlass);
+    const body = phys.dynamicBody(new CANNON.Cylinder(Math.max(d.prof[d.prof.length - 1][0], d.maxR * 0.6), d.prof[1][0], d.H, 10), d.mass, new CANNON.Vec3(0, 1, 0), d.mat === 'ceramic' || d.mat === 'plastic' ? phys.mats.matGround : phys.mats.matGlass);
     const mix = new Mixture(20);
     mix.extraC = d.heatC;
     const it = register({
       kind: 'vessel', type, def: d, group, body, mix, name: o.label || d.name, label: o.label || null, layers, surface, pieces, extras: [surface, ...pieces],
-      halfH: d.H / 2, pickR: Math.max(d.maxR, 0.03) + 0.015, breakV: d.breakV, sound: d.mat === 'ceramic' ? 'clink' : 'clink', dirty: true, an: null,
+      halfH: d.H / 2, pickR: Math.max(d.maxR, 0.03) + 0.015, breakV: d.breakV, sound: d.mat === 'plastic' ? 'thud' : 'clink', dirty: true, an: null,
       up: V(0, 1, 0), base: V(), foam: 0, pourAcc: 0, pourT: 0, pieceMol: {}, pieceShape: {}, air: d.air ?? 0.6, skitter: 0, flowing: 0, supply: !!o.label,
     });
     return it;
@@ -181,9 +182,9 @@ export function createMatter(G) {
       geo.computeVertexNormals();
       phShape = new CANNON.Box(new CANNON.Vec3(w / 2, h / 2, dd / 2)); halfH = h / 2; pickR = Math.max(w, dd) * 0.45;
       mat.flatShading = false;
-    } else if (shape === 'ribbon' || shape === 'nail') {
-      const len = shape === 'nail' ? 0.05 : 0.07, a = Math.sqrt(volM3 / len), w = shape === 'nail' ? a : a * 2.4, h = shape === 'nail' ? a : a / 2.4;
-      geo = shape === 'nail' ? new THREE.CylinderGeometry(a * 0.55, a * 0.4, len, 8).rotateZ(Math.PI / 2) : new THREE.BoxGeometry(len, h, w, 6, 1, 1);
+    } else if (shape === 'ribbon' || shape === 'nail' || shape === 'stick') {
+      const len = shape === 'nail' ? 0.05 : shape === 'stick' ? 0.24 : 0.07, a = Math.sqrt(volM3 / len), w = shape === 'ribbon' ? a * 2.4 : a, h = shape === 'ribbon' ? a / 2.4 : a;
+      geo = shape === 'nail' ? new THREE.CylinderGeometry(a * 0.55, a * 0.4, len, 8).rotateZ(Math.PI / 2) : shape === 'stick' ? new THREE.CylinderGeometry(a * 0.5, a * 0.62, len, 7).rotateZ(Math.PI / 2) : new THREE.BoxGeometry(len, h, w, 6, 1, 1);
       if (shape === 'ribbon') { const p = geo.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, p.getY(i) + Math.sin(p.getX(i) * 90) * 0.0025); geo.computeVertexNormals(); }
       phShape = new CANNON.Box(new CANNON.Vec3(len / 2, Math.max(0.004, h / 2 + 0.002), Math.max(0.005, w / 2))); halfH = Math.max(0.004, h / 2 + 0.002); pickR = len * 0.55;
     } else {
@@ -199,7 +200,7 @@ export function createMatter(G) {
     const mix = new Mixture(o.T ?? 20);
     mix.add(id, mol, o.T ?? 20, o.surf ?? CHUNK);
     return register({
-      kind: 'lump', sub: id, shape, group, body, mix, mesh, mat, name: s.name + (shape === 'ingot' ? ' bar' : shape === 'ribbon' ? ' ribbon' : shape === 'nail' ? ' nail' : massKg > 0.02 ? ' lump' : ''),
+      kind: 'lump', sub: id, shape, group, body, mix, mesh, mat, name: o.name || s.name + (shape === 'ingot' ? ' bar' : shape === 'ribbon' ? ' ribbon' : shape === 'nail' ? ' nail' : massKg > 0.02 ? ' lump' : ''),
       halfH, pickR, sound: s.look === 'metal' ? (massKg > 3 ? 'heavy' : 'metal') : 'thud', air: 1, mol0: mol, baseColor: new THREE.Color(s.color), small: massKg < 0.08,
     });
   }
@@ -291,7 +292,11 @@ export function createMatter(G) {
     if (parcels.length > MAXP) { const p = parcels.shift(); landOnGround(p); }
   }
   function landOnGround(p) { const hit = phys.raycast(p.x, p.y + 0.02, p.z, p.x, p.y - 4, p.z, G_STATIC); if (hit) spill(p.mix, hit.hitPointWorld.x, hit.hitPointWorld.y, hit.hitPointWorld.z); }
-  function inDrain(x, y, z) { for (const d of G.drains) if (x > d.x0 && x < d.x1 && z > d.z0 && z < d.z1 && y < d.y + 0.25 && y > d.y - 0.1) return true; return false; }
+  function inDrain(x, y, z) {
+    for (const d of G.drains) if (x > d.x0 && x < d.x1 && z > d.z0 && z < d.z1 && y < d.y + 0.25 && y > d.y - 0.1) return true;
+    if (G.waterAt) { const wl = G.waterAt(x, z); if (wl !== null && y < wl + 0.05) return true; } // the stream or lake carries it away
+    return false;
+  }
   function updateParcels(dt) {
     let n = 0;
     for (let i = parcels.length - 1; i >= 0; i--) {
@@ -657,7 +662,8 @@ export function createMatter(G) {
       for (const it of items) {
         if (it.kind !== 'vessel' || it.up.y < 0.55) continue;
         const b = it.body.position;
-        if (Math.abs(lp.x - b.x) > 0.08 || Math.abs(lp.z - b.z) > 0.08 || Math.abs(lp.y - b.y) > 0.16) continue;
+        const span = Math.max(0.08, it.def.rimR + 0.01);
+        if (Math.abs(lp.x - b.x) > span || Math.abs(lp.z - b.z) > span || Math.abs(lp.y - b.y) > Math.max(0.16, it.def.H * 0.7)) continue;
         cv.set(lp.x, lp.y, lp.z); it.body.pointToLocalFrame(cv, cv2);
         const hb = cv2.y + it.halfH, rad = Math.hypot(cv2.x, cv2.z);
         if (hb > 0 && hb < it.def.H + 0.012 && rad < it.def.rimR + 0.002) {

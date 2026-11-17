@@ -73,7 +73,7 @@ Sleeping in your bed regrows the forest and restocks the kitchen. Only findable 
 
 Press **T** (or Ask on touch) to chat with the Lab Assistant, a small offline helper built into the page. It needs no internet and no AI service.
 
-- It stores over 3,000 questions with answers, generated from the game's own data (every reaction, substance, element, discovery, material and goal) plus written answers on how to play and basic chemistry ideas.
+- It stores over 3,700 questions with answers, generated from the game's own data (every reaction, substance, element, discovery, material and goal) plus written answers on how to play and basic chemistry ideas.
 - "What does A and B make?" and "How do I make X?" are worked out directly from the reaction rules, with the equation, the conditions (heat, flame, catalyst, powder) and the science.
 - Anything else is matched to the closest stored question by word overlap (TF-IDF).
 - It only knows this game. It is not a general chatbot.

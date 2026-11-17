@@ -53,7 +53,7 @@ export function createAssistant() {
   function how(rx) {
     const c = rx.conditions || {}, steps = [];
     const ins = rx.inputs.filter((i) => i.from !== 'air').map((i) => lc(SUB[i.id].name));
-    steps.push('Put ' + list(ins) + ' together' + (rx.requires ? ' with ' + list(rx.requires.map((r) => lc(SUB[r.id].name))) : '') + '.');
+    steps.push((ins.length > 1 ? 'Put ' + list(ins) + ' together' : 'Put ' + ins[0] + ' in a container') + (rx.requires ? ' with ' + list(rx.requires.map((r) => lc(SUB[r.id].name))) : '') + '.');
     if (c.minSurf) steps.push('Solids must be powdered: crush lumps with the rock pick (Story Mode) or use powders.');
     if (rx.catalysts) steps.push('It needs a catalyst: ' + list(rx.catalysts.map((k) => lc(SUB[k.id].name))) + '.');
     if (rx.inputs.some((i) => i.from === 'air')) steps.push('It needs air, so use an open container.');
@@ -80,6 +80,33 @@ export function createAssistant() {
   const KB = []; // { q, a }
   const about = {}; // substance id or element symbol -> its description
   const add = (qs, a) => { for (const q of [].concat(qs)) KB.push({ q, a }); };
+  // structured answers: F['sub:id' or 'el:Sym'][intent], so the question type picks the answer
+  const F = {};
+  const put = (key, intent, qs, a) => { add(qs, a); (F[key] ||= {})[intent] = a; };
+  // where the real world gets the starting elements that the lab cannot hand you yet
+  const REAL = {
+    H: 'Most hydrogen is made from natural gas, or by splitting water with electricity (electrolysis).',
+    He: 'Helium is pumped out of natural gas wells. It forms underground when radioactive rocks decay, and gets trapped with the gas.',
+    N: 'Nitrogen is made by cooling air until it turns liquid, then letting the parts boil off one by one (fractional distillation). Air is 78% nitrogen.',
+    O: 'Oxygen comes from liquefying air and separating it (21% of air), or from splitting water by electrolysis.',
+    Ne: 'Neon is separated from liquefied air, where it makes up about 0.0018%.',
+    Cl: 'Chlorine is made by passing electricity through salt water (electrolysis of brine).',
+  };
+  function getElement(e) {
+    const sid = subOfEl(e), s = sid && SUB[sid], bits = [];
+    const made = sid ? RX.filter((r) => r.outputs.some((o) => o.id === sid)) : [];
+    const mats = MATS.filter((m) => SUB[m.sub] && SUB[m.sub].el === e.sym);
+    if (e.start) {
+      if (e.state !== 'gas' && s && s.supply) bits.push(`In Normal Mode ${lc(e.name)} is on the element storage shelves (west wall of the lab).`);
+      else if (e.state === 'gas') bits.push(`${e.name} is unlocked, but you cannot hold a sample yet: gas cylinders arrive with the gas-handling update.${made.length ? '' : ''}`);
+      else bits.push(`${e.name} is one of the starting elements.`);
+    } else bits.push(`${e.name} is locked (tier ${e.tier || '?'}). It needs equipment from a later update.`);
+    if (made.length) bits.push(`You can make it: ${made.map((r) => `${r.name}. ${how(r)}`).join(' Or: ')}`);
+    if (mats.length) bits.push(`In Story Mode: ${mats.map((m) => `${m.name}: ${m.where}`).join(' ')}`);
+    const real = REAL[e.sym] || [e.hint, e.method && 'Method: ' + e.method].filter(Boolean).join(' ');
+    if (real) bits.push(`In real life: ${real}`);
+    return `**How to get ${e.name}.** ` + bits.join(' ');
+  }
 
   for (const rx of RX) {
     const ins = rx.inputs.filter((i) => i.from !== 'air').map((i) => lc(SUB[i.id].name));
@@ -95,22 +122,25 @@ export function createAssistant() {
     const made = RX.filter((r) => r.outputs.some((o) => o.id === id)), used = RX.filter((r) => r.inputs.some((i) => i.id === id));
     const mat = MATS.find((m) => m.sub === id);
     const info = `**${s.name}**${s.formula ? ' (' + s.formula + ')' : ''}: ${s.fact || ''} At room temperature it is a ${s.state === 's' ? 'solid' : s.state === 'l' ? 'liquid' : 'gas'}${s.mp !== undefined && s.mp !== null ? `, melting at ${s.mp} °C` : ''}${s.bp !== undefined && s.bp !== null ? ` and boiling at ${s.bp} °C` : ''}.`;
-    add([`what is ${n}`, `tell me about ${n}`, `${n}`], info); about[id] = info;
-    if (s.formula) add([`what is the formula of ${n}`, `formula for ${n}`], `${s.name} is ${s.formula}.`);
-    add([`is ${n} dangerous`, `is ${n} safe to touch`], (s.tags || []).length ? `${s.name} is tagged ${list((s.tags || []).map((t) => t.replace(/_/g, ' ')))}. ${s.handle === 'tongs' ? 'Use tongs (1): it burns bare skin.' : 'Handle it carefully.'}` : `${s.name} is not hazardous in the game.`);
-    add([`what reacts with ${n}`, `what can I mix with ${n}`, `what can I do with ${n}`], used.length ? `${s.name} is used in: ${used.map((r) => r.name + ' (with ' + list(r.inputs.filter((i) => i.id !== id && i.from !== 'air').map((i) => lc(SUB[i.id].name))) + (r.inputs.some((i) => i.from === 'air') ? (r.inputs.length > 2 ? ' and' : '') + ' air' : '') + ')').join('; ')}.` : `Nothing in the game reacts with ${n} yet, but it can still dissolve, melt or boil.`);
-    add([`how do I make ${n}`, `how to get ${n}`, `where does ${n} come from`], made.length ? `${s.name} is made by ${made.map((r) => `${r.name}: ${how(r)}`).join(' Or: ')}` : mat ? `Find it in Story Mode: ${mat.where}` : s.supply || s.el ? `${s.name} is on the lab shelves in Normal Mode.` : `${s.name} cannot be made in the game yet.`);
-    add([`does ${n} dissolve in water`, `is ${n} soluble`], s.sol ? `Yes: about ${s.sol} g dissolves in 100 g of water at 20 °C${s.solHot !== undefined ? `, and ${s.solHot} g when hot, so it crystallises as it cools` : ''}.` : s.state === 's' ? `No, ${n} does not dissolve in water.` : `${s.name} is a ${s.state === 'l' ? 'liquid' : 'gas'}.`);
+    put('sub:' + id, 'about', [`what is ${n}`, `tell me about ${n}`, `${n}`], info); about[id] = info;
+    if (s.formula) put('sub:' + id, 'formula', [`what is the formula of ${n}`, `formula for ${n}`], `${s.name} is ${s.formula}.`);
+    put('sub:' + id, 'danger', [`is ${n} dangerous`, `is ${n} safe to touch`], (s.tags || []).length ? `${s.name} is tagged ${list((s.tags || []).map((t) => t.replace(/_/g, ' ')))}. ${s.handle === 'tongs' ? 'Use tongs (1): it burns bare skin.' : 'Handle it carefully.'}` : `${s.name} is not hazardous in the game.`);
+    put('sub:' + id, 'react', [`what reacts with ${n}`, `what can I mix with ${n}`, `what can I do with ${n}`], used.length ? `${s.name} is used in: ${used.map((r) => r.name + ' (with ' + list([...r.inputs.filter((i) => i.id !== id && i.from !== 'air').map((i) => lc(SUB[i.id].name)), ...(r.inputs.some((i) => i.from === 'air') ? ['air'] : [])]) + ')').join('; ')}.` : `Nothing in the game reacts with ${n} yet, but it can still dissolve, melt or boil.`);
+    const getIt = [`**How to get ${n}.**`, id === 'water' ? 'In Normal Mode turn on the cold tap at the sink (F).' : s.supply ? 'It is on the lab shelves in Normal Mode.' : '', mat ? `In Story Mode: ${mat.where} How: ${lc(mat.how)}.` : '',
+      made.length ? `${s.supply || mat ? 'It can also be made' : 'Make it'}: ${made.slice(0, 2).map((r) => `${r.name}. ${how(r)}`).join(' Or: ')}${made.length > 2 ? ` (and ${made.length - 2} more reactions)` : ''}` : '', !made.length && !s.supply && !mat ? 'It cannot be made in the game yet.' : ''].filter(Boolean).join(' ');
+    put('sub:' + id, 'get', [`how do I make ${n}`, `how to get ${n}`, `where does ${n} come from`, `where do I find ${n}`], getIt);
+    put('sub:' + id, 'dissolve', [`does ${n} dissolve in water`, `is ${n} soluble`], s.sol ? `Yes: about ${s.sol} g dissolves in 100 g of water at 20 °C${s.solHot !== undefined ? `, and ${s.solHot} g when hot, so it crystallises as it cools` : ''}.` : s.state === 's' ? `No, ${n} does not dissolve in water.` : `${s.name} is a ${s.state === 'l' ? 'liquid' : 'gas'}.`);
   }
   for (const e of ELEMENTS) {
     const n = lc(e.name), sid = subOfEl(e);
     const basics = `**${e.name}** (${e.sym}) is element number ${e.z}, a ${e.block} with an atomic mass of ${e.mass} u. It is a ${e.state || 'solid'} at room temperature${e.mp !== null && e.mp !== undefined ? `, melts at ${e.mp} °C` : ''}${e.bp !== null && e.bp !== undefined ? ` and boils at ${e.bp} °C` : ''}. Known since: ${e.year || 'unknown'}.`;
     about[e.sym] = basics + (sid && SUB[sid].fact ? ' ' + SUB[sid].fact : '');
-    add([`what is ${n}`, `tell me about ${n}`, `${lc(e.sym)} element`], about[e.sym]);
-    add([`what is the symbol for ${n}`, `what element is ${lc(e.sym)}`], `${e.name} has the symbol ${e.sym}.`);
-    add([`atomic number of ${n}`, `what number is ${n}`], `${e.name} is number ${e.z} on the periodic table.`);
-    add([`melting point of ${n}`, `when does ${n} melt`], e.mp !== null && e.mp !== undefined ? `${e.name} melts at ${e.mp} °C${e.bp ? ' and boils at ' + e.bp + ' °C' : ''}.` : `The melting point of ${e.name} is not known well.`);
-    add([`how do I get ${n}`, `how do I unlock ${n}`, `where is ${n}`], e.start ? `${e.name} is one of the starting elements${sid && SUB[sid].supply ? ': it is on the element shelves in Normal Mode' : ''}.${MATS.some((m) => SUB[m.sub] && SUB[m.sub].el === e.sym) ? ' In Story Mode: ' + MATS.filter((m) => SUB[m.sub] && SUB[m.sub].el === e.sym).map((m) => m.where).join(' ') : ''}` : `${e.name} is locked. ${e.hint || 'It needs equipment from a later update.'}`);
+    put('el:' + e.sym, 'about', [`what is ${n}`, `tell me about ${n}`, `${lc(e.sym)} element`], about[e.sym]);
+    put('el:' + e.sym, 'formula', [`what is the symbol for ${n}`, `what element is ${lc(e.sym)}`], `${e.name} has the symbol ${e.sym}.`);
+    put('el:' + e.sym, 'number', [`atomic number of ${n}`, `what number is ${n}`], `${e.name} is number ${e.z} on the periodic table.`);
+    put('el:' + e.sym, 'temp', [`melting point of ${n}`, `when does ${n} melt`], e.mp !== null && e.mp !== undefined ? `${e.name} melts at ${e.mp} °C${e.bp ? ' and boils at ' + e.bp + ' °C' : ''}.` : `The melting point of ${e.name} is not known well.`);
+    put('el:' + e.sym, 'get', [`how do I get ${n}`, `how do I unlock ${n}`, `where is ${n}`, `how do I make ${n}`, `where does ${n} come from`], getElement(e));
+    if (sid) for (const k of ['react', 'danger', 'dissolve']) if (F['sub:' + sid] && F['sub:' + sid][k]) F['el:' + e.sym][k] = F['sub:' + sid][k];
   }
   for (const d of DISC_LIST) {
     const n = lc(d.name);
@@ -198,6 +228,25 @@ export function createAssistant() {
     const q = norm(raw);
     if (!q) return { a: 'Ask me anything about the lab: what two things make, how to make something, where to find a material...' };
     const subs = findSubs(q);
+    // one thing asked about: work out what kind of question it is, then answer exactly that
+    const words = q.split(' ');
+    const elHit = words.map((w) => elByName.get(w) || (w.length <= 2 && !STOP.has(w) && w !== 'i' && elBySym.get(w))).find(Boolean);
+    let key = null;
+    if (subs.length === 1) { const s = SUB[subs[0]]; key = s.el ? 'el:' + s.el : 'sub:' + subs[0]; }
+    else if (!subs.length && elHit) key = 'el:' + elHit.sym;
+    const intent = /\b(dangerous|danger|safe|toxic|hurt|harm|explode|poison)/.test(q) ? 'danger'
+      : /\b(dissolve|soluble|solubility)/.test(q) ? 'dissolve'
+      : /\b(formula|symbol)\b/.test(q) ? 'formula'
+      : /\b(atomic number|what number|proton)/.test(q) ? 'number'
+      : /\b(melt|melting|boil|boiling)\b/.test(q) ? 'temp'
+      : /\b(react|reacts|mix|combine|do with|use .* for|used for)\b/.test(q) ? 'react'
+      : /\b(get|find|obtain|unlock|collect|make|produce|create|extract|buy|where|source|comes? from)\b/.test(q) ? 'get'
+      : /^(what|whats|tell|describe|info|explain|who)\b/.test(q) || words.length <= 2 ? 'about' : null;
+    if (key && intent && (subs.length <= 1) && F[key] && F[key][intent]) {
+      const name = key.startsWith('el:') ? lc(ELEMENTS.find((e) => 'el:' + e.sym === key).name) : lc(SUB[subs[0]].name);
+      const more = ['get', 'react', 'danger', 'about'].filter((k) => k !== intent && F[key][k]).map((k) => ({ get: `how do I get ${name}`, react: `what reacts with ${name}`, danger: `is ${name} dangerous`, about: `what is ${name}` }[k]));
+      return { a: F[key][intent], related: more.slice(0, 2) };
+    }
     // "what is X?" about one thing: describe it
     if (subs.length === 1 && /^(what is|whats|what s|what are|tell me about|describe|info on|explain)\b/.test(q) && q.split(' ').length <= 6) {
       const s = SUB[subs[0]], e = s.el && ELEMENTS.find((x) => x.sym === s.el);

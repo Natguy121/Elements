@@ -207,7 +207,19 @@ export function createStory(G, d) {
 
   // ---------- goals and unlocks ----------
   let gasMade = false;
-  G.hooks.reacted = (rx) => { if (G.story && !gasMade && rx.outputs.some((o) => SUB[o.id].state === 'g')) gasMade = true; };
+  G.hooks.reacted = (rx) => {
+    if (!G.story) return;
+    if (!gasMade && rx.outputs.some((o) => SUB[o.id].state === 'g')) gasMade = true;
+    // a pure element made from an ore (smelted copper or iron) goes on your periodic table
+    for (const o of rx.outputs) {
+      const s = SUB[o.id];
+      if (!s.el || G.have.has(s.el)) continue;
+      addEl(s.el);
+      hud.banner({ id: 'el_' + s.el, name: s.name, cat: 'Elements', formula: s.el, fact: s.fact, eyebrow: 'Element obtained' });
+      log(`Element obtained: ${s.name} (${s.el}), made by ${rx.name.toLowerCase()}.`);
+      persist();
+    }
+  };
   const has = (...ids) => ids.some((id) => prog().found[id]);
   const CHECK = {
     outside: (z) => z !== 'house',

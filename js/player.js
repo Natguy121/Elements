@@ -52,9 +52,10 @@ export function createPlayer(phys, camera, settings) {
     p.crouch = !p.dead && k.has('KeyC'); // not Ctrl: Ctrl+W closes the browser tab
     const moving = len > 0.1;
     const sprint = !p.crouch && moving && f > 0 && k.has('ShiftLeft') && p.stamina > 0.05;
-    const load = 1 / (1 + p.carryMass / 22);
+    const load = p.god ? 1 : 1 / (1 + p.carryMass / 22);
     let speed = (p.crouch ? 1.5 : sprint ? 5.0 : 3.0) * (0.35 + 0.65 * load) * (p.health < 35 ? 0.75 : 1) * (p.slow ?? 1);
-    if (sprint) p.stamina = Math.max(0, p.stamina - dt * (0.1 + p.carryMass * 0.012));
+    if (p.god) p.stamina = 1;
+    else if (sprint) p.stamina = Math.max(0, p.stamina - dt * (0.1 + p.carryMass * 0.012));
     else if (p.strain < 0.55) p.stamina = Math.min(1, p.stamina + dt * (moving ? 0.07 : 0.14));
 
     const sn = Math.sin(p.yaw), cs = Math.cos(p.yaw);
@@ -111,7 +112,7 @@ export function createPlayer(phys, camera, settings) {
   };
 
   p.hurt = (amount, why, now) => {
-    if (p.dead || amount <= 0) return;
+    if (p.dead || amount <= 0 || p.god) return; // god mode: nothing hurts
     p.health = Math.max(0, p.health - amount);
     if (now - p.lastHurt > 0.5) { play('ouch'); p.lastHurt = now; }
     p.onHurt && p.onHurt(amount, why);

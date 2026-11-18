@@ -159,6 +159,7 @@ export function createNet(G, d) {
     if (m.t === 'gone') { const it = byNid.get(m.nid); if (it) { matter.remove(it); } return; }
     if (m.t === 'need') { for (const nid of m.nids) { const it = byNid.get(nid); if (it && !it.dead) c.conn.send({ t: 'spawn', d: describe(it) }); } return; }
     if (m.t === 'use') { const f = G.fixtures[m.i]; if (f && !(f.off && f.off())) f.use(); return; }
+    if (m.t === 'chat') { const text = clean(m.text); if (!text) return; d.onChat && d.onChat(c.name, text, c.color); broadcast({ t: 'chat', from: c.name, color: c.color, text }, c.id); return; }
   }
   function host() {
     if (peer) return;
@@ -167,6 +168,7 @@ export function createNet(G, d) {
     setStatus('Opening room...');
     peer = new window.Peer(PREFIX + code, opts());
     peer.on('open', () => setStatus('Hosting'));
+    peer.on('call', answerCall);
     peer.on('error', (e) => {
       if (e.type === 'unavailable-id') { peer.destroy(); peer = null; role = null; host(); return; }
       setStatus('Error: ' + (e.type || e.message));
@@ -210,6 +212,7 @@ export function createNet(G, d) {
     role = 'guest'; code = c;
     setStatus('Connecting...');
     peer = new window.Peer(opts());
+    peer.on('call', answerCall);
     peer.on('open', (id) => {
       myId = id; G.netPrefix = id.slice(0, 6) + '-';
       hostConn = peer.connect(PREFIX + c, { reliable: true });
@@ -233,6 +236,7 @@ export function createNet(G, d) {
       setStatus('Playing');
       return;
     }
+    if (m.t === 'chat') { d.onChat && d.onChat(m.from, clean(m.text), m.color); return; }
     if (!d.mode()) return;
     if (m.t === 'spawn') { try { create(m.d); } catch (e) { console.error('spawn failed', e); } return; }
     if (m.t === 'gone') { drop(m.nid); return; }
@@ -268,8 +272,76 @@ export function createNet(G, d) {
     }
   }
 
+  // ---------- text chat ----------
+  const clean = (t) => String(t || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 200);
+  function say(text) {
+    text = clean(text);
+    if (!text || !role) return false;
+    d.onChat && d.onChat(myName + ' (you)', text, COLORS[0]);
+    if (role === 'host') broadcast({ t: 'chat', from: myName, color: COLORS[0], text });
+    else send({ t: 'chat', text });
+    return true;
+  }
+
+  // ---------- voice: every player with a microphone on calls every other player ----------
+  let mic = null, callT = 0;
+  const calls = new Map(), voices = new Map(); // peer id -> outgoing call / incoming audio
+  function others() {
+    if (role === 'host') return [...conns.keys()];
+    if (role === 'guest') return [PREFIX + code, ...[...avatars.keys()].filter((id) => id !== 'host' && id !== myId)];
+    return [];
+  }
+  function answerCall(call) {
+    call.answer(); // listen only: they hear us through our own call to them
+    call.on('stream', (stream) => {
+      let a = voices.get(call.peer);
+      if (!a) { a = new Audio(); a.autoplay = true; voices.set(call.peer, a); }
+      a.srcObject = stream; a.play().catch(() => {});
+    });
+    const end = () => { const a = voices.get(call.peer); if (a) { a.srcObject = null; voices.delete(call.peer); } };
+    call.on('close', end); call.on('error', end);
+  }
+  function callAll() {
+    if (!mic || !peer) return;
+    for (const id of others()) {
+      if (calls.has(id)) continue;
+      const call = peer.call(id, mic);
+      if (!call) continue;
+      calls.set(id, call);
+      const end = () => calls.delete(id);
+      call.on('close', end); call.on('error', end);
+    }
+  }
+  async function setMic(on) {
+    if (on && !mic) {
+      if (!role) { hud.toast('Voice', 'Join or host a game first.'); return false; }
+      try { mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
+      catch (e) { hud.toast('Voice', 'No microphone here (or it was blocked). You can still type: press Enter to chat.'); mic = null; return false; }
+      callAll();
+      hud.toast('Voice', 'Microphone on. Everyone in the game can hear you. Press V to mute.');
+    } else if (!on && mic) {
+      for (const t of mic.getTracks()) t.stop();
+      mic = null;
+      for (const c of calls.values()) try { c.close(); } catch (e) { /* closing anyway */ }
+      calls.clear();
+      hud.toast('Voice', 'Microphone off.');
+    }
+    return !!mic;
+  }
+  // voices are louder when the speaker stands near you
+  function voiceUpdate(dt) {
+    callT -= dt;
+    if (callT <= 0) { callT = 2; callAll(); }
+    for (const [pid, a] of voices) {
+      const av = avatars.get(pid === PREFIX + code ? 'host' : pid);
+      const dist = av ? av.g.position.distanceTo(player.pos) : 5;
+      a.volume = Math.max(0.15, Math.min(1, 1.25 - dist / 25));
+    }
+  }
+
   // ---------- shared ----------
   function update(dt) {
+    if (role) voiceUpdate(dt);
     if (role === 'host' && d.mode()) hostTick(dt);
     else if (role === 'guest' && hostConn && hostConn.open && d.mode()) guestTick(dt);
     for (const [, a] of avatars) {
@@ -286,6 +358,9 @@ export function createNet(G, d) {
     for (const [, c] of conns) if (c.ready) c.conn.send({ t: 'mode', mode, items: mode ? [...matter.items].filter((it) => !it.dead).map(describe) : [], fix: fixState() });
   }
   function leave(keepStatus) {
+    setMic(false);
+    for (const a of voices.values()) a.srcObject = null;
+    voices.clear();
     for (const [, c] of conns) try { c.conn.close(); } catch (e) { /* closing anyway */ }
     conns.clear();
     if (hostConn) try { hostConn.close(); } catch (e) { /* closing anyway */ }
@@ -309,7 +384,9 @@ export function createNet(G, d) {
   const otherHolds = (it) => it && it.netHeld > G.time;
 
   return {
-    host, join, leave, update, modeChanged, useFixture, otherHolds,
+    host, join, leave, update, modeChanged, useFixture, otherHolds, say, setMic,
+    get micOn() { return !!mic; },
+    get hearing() { return [...voices.values()].filter((a) => a.srcObject && a.srcObject.getAudioTracks().some((t) => t.readyState === 'live')).length; },
     get role() { return role; }, get code() { return code; }, get status() { return status; },
     get count() { return role === 'host' ? conns.size + 1 : role === 'guest' ? avatars.size + 1 : 0; },
     get guest() { return role === 'guest'; },

@@ -99,6 +99,10 @@ A **catalyst table** by the restock lever holds 21 catalysts. Among them: vanadi
 
 Sulfuric, nitric and phosphoric acid are no longer on the shelves: make them. About 610 of the new compounds can be made from the starting chemicals, some through chains of five to seven steps. Everything else has to be made from these, often in several steps. For example, copper hydroxide is made by dissolving copper in nitric acid and then precipitating it with sodium hydroxide. About 610 of the new compounds can be reached this way. Ask the Lab Assistant "how do I make X" and it gives the steps in order from the starting chemicals. Story Mode keeps its own rule: everything is found outside.
 
+## Owner mode
+
+Typing the owner code in the pause menu (Owner code, then Enter) turns on god mode: no damage, unlimited stamina, and enough strength to lift anything, even the drum. A GOD MODE chip shows it is on, and it is remembered on that device. Entering the code again turns it off. The code is in the page's source, so treat it as a fun switch, not a secret.
+
 ## Lab Assistant
 
 Press **T** (or Ask on touch) to chat with the Lab Assistant, a small offline helper built into the page. It needs no internet and no AI service.
@@ -118,6 +122,11 @@ On the title screen, **Host game** opens a room and shows a 5-letter code. Frien
 - Guests flip switches through the host. Only the host can restock. A guest's own saves are never touched; in Story Mode the host's save is the one that counts.
 - Not shared yet: spills on the floor, gas clouds and pour streams (each player sees their own). Voice chat is not included.
 - About 4 players works best.
+
+**Talking.** In a multiplayer game:
+- **Enter** opens a text chat that everyone sees.
+- **V** (or the Mic button) turns your microphone on. Voices are peer-to-peer and get quieter with distance, so you hear people near you best.
+- Players without a microphone can still hear others and type. If the page is shown somewhere that blocks microphones, the game says so and the chat still works.
 
 If a page host blocks WebRTC or the PeerJS server, serve the repository with GitHub Pages or any static host instead.
 

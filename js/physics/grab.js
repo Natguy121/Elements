@@ -166,7 +166,7 @@ export function createGrab(phys, player, camera, hooks) {
     // tiredness and stuck checks
     player.carryMass = b.mass;
     player.strain += (h.strain - player.strain) * Math.min(1, dt * 6);
-    if (h.strain > 0.5) player.stamina = Math.max(0, player.stamina - dt * (h.strain - 0.45) * 0.22);
+    if (h.strain > 0.5 && !player.god) player.stamina = Math.max(0, player.stamina - dt * (h.strain - 0.45) * 0.22);
     b.pointToWorldFrame(h.local, p);
     const err = Math.hypot(h.target.x - p.x, h.target.y - p.y, h.target.z - p.z);
     h.err = err;
@@ -196,7 +196,7 @@ export function createGrab(phys, player, camera, hooks) {
     const vl = Math.hypot(vx, vy, vz);
     if (vl > vmax) { const k = vmax / vl; vx *= k; vy *= k; vz *= k; }
     F.set(kd * (vx - v.x), kd * (vy - v.y), kd * (vz - v.z));
-    const max = STRENGTH * (h.item.helpers ? 1 + h.item.helpers : 1);
+    const max = STRENGTH * (h.item.helpers ? 1 + h.item.helpers : 1) * (player.god ? 25 : 1); // god mode: lift anything
     // holding it up counts against your strength too, but is applied at the centre of mass so a
     // container held by its mouth does not hang like a pendulum and refuse to tip
     const lift = Math.min(m * 9.81, max), budget = Math.sqrt(Math.max(0, max * max - lift * lift)), len = F.length();

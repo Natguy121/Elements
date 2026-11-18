@@ -450,6 +450,9 @@ function boot() {
   function uiKeys() {
     if (state !== 'play') return;
     if (askUI.isOpen) { if (input.hit('Escape')) askUI.close(); return; }
+    if (chatOpen) return;
+    if (net.role && input.hit('Enter') && !hud.bookOpen && !hud.pauseOpen) { openChat(); return; }
+    if (net.role && input.hit('KeyV') && !hud.bookOpen && !hud.pauseOpen) { toggleMic(); }
     if (input.hit('KeyT') && !hud.bookOpen && !hud.pauseOpen) { uiOpen = true; input.st.enabled = false; input.unlock(); askUI.open(); play('ui'); return; }
     if (input.hit('KeyH') && (G.story || G.settings.mode !== 'discovery') && !hud.bookOpen && !hud.pauseOpen) { hud.guide(); play('ui'); }
     if (input.hit('KeyZ') && !hud.bookOpen && !hud.pauseOpen) {
@@ -518,9 +521,30 @@ function boot() {
     enterAsGuest: (mode) => { worldMode = ''; startMode(mode, { guest: true }); },
     onLeft: () => { if (state !== 'menu') G.hooks.title(); },
     onStatus: () => showNet(),
+    onChat: (from, text, color) => chatLine(from, text, color),
   });
   G.net = net;
+  // ---------- text chat and voice ----------
+  let chatOpen = false;
+  function chatLine(from, text, color) {
+    const li = document.createElement('li');
+    const b = document.createElement('b'); b.textContent = from; b.style.color = '#' + (color || 0xffd400).toString(16).padStart(6, '0');
+    li.append(b, document.createTextNode(text));
+    $('chatLog').appendChild(li);
+    while ($('chatLog').children.length > 30) $('chatLog').firstChild.remove();
+    setTimeout(() => li.classList.add('old'), 12000);
+    play('note', null, 0.3);
+  }
+  function openChat() { chatOpen = true; uiOpen = true; input.st.enabled = false; input.unlock(); $('chatBox').classList.add('open'); $('chatInput').hidden = false; $('chatInput').value = ''; setTimeout(() => $('chatInput').focus(), 20); }
+  function closeChat() { chatOpen = false; $('chatBox').classList.remove('open'); $('chatInput').hidden = true; $('chatInput').blur(); G.hooks.resume(); }
+  $('chatInput').onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') { net.say($('chatInput').value); closeChat(); } else if (e.key === 'Escape') closeChat(); };
+  $('chatInput').onkeyup = (e) => e.stopPropagation();
+  async function toggleMic() { const on = await net.setMic(!net.micOn); $('micBtn').classList.toggle('on', on); $('micBtn').textContent = on ? 'Mic on · V' : 'Mic off · V'; $('micBtn').setAttribute('aria-pressed', on); }
+  $('micBtn').onclick = toggleMic;
   function showNet() {
+    const mp = !!net.role;
+    document.body.classList.toggle('mp', mp); $('chatBox').hidden = !mp; $('micBtn').hidden = !mp;
+    if (!mp && net.micOn === false) $('micBtn').classList.remove('on');
     const r = net.role, st = net.status;
     $('mpStatus').textContent = r === 'host' ? (net.code ? `Room code ${net.code} · ${st}${net.count > 1 ? ' · ' + net.count + ' players' : ''}` : st) : st;
     $('btnHost').hidden = r === 'guest'; $('btnHost').textContent = r === 'host' ? 'Stop hosting' : 'Host game';
@@ -530,6 +554,17 @@ function boot() {
     $('netChip').hidden = !r;
     $('netChip').textContent = r === 'host' ? `Room ${net.code} · ${net.count} player${net.count === 1 ? '' : 's'}` : r === 'guest' ? `Room ${net.code} · ${net.count} players` : '';
   }
+  // ---------- owner code: god mode ----------
+  const OWNER = 'Antoine121';
+  function setGod(on) { player.god = on; G.settings.god = on; persist(); $('godChip').hidden = !on; if (on) { player.health = 100; player.stamina = 1; } }
+  $('ownerBtn').onclick = () => {
+    const v = $('ownerCode').value; $('ownerCode').value = '';
+    if (v !== OWNER) { hud.toast('Owner code', 'That code is not right.', 'warn'); return; }
+    setGod(!player.god); play('ding');
+    hud.toast('Owner', player.god ? 'God mode on: nothing hurts you, stamina never runs out, and you can lift anything.' : 'God mode off.');
+  };
+  $('ownerCode').onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') $('ownerBtn').click(); };
+  if (G.settings.god) setGod(true);
   $('mpName').value = net.name;
   $('mpName').onchange = () => net.setName($('mpName').value);
   $('btnHost').onclick = () => { initAudio(); play('ui'); if (net.role === 'host') net.leave(); else net.host(); showNet(); };

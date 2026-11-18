@@ -268,3 +268,19 @@ body.story .touch .stu { display: none !important; }
 .chips button:hover { border-color: var(--accent); }
 .ask-form { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); }
 .ask-form input { flex: 1; min-width: 0; font: 400 15px var(--body); color: var(--paper); background: #0c1114; border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; user-select: text; -webkit-user-select: text; }
+
+/* ---------- chat, voice, god mode ---------- */
+.chatbox { position: absolute; left: var(--gl); bottom: calc(var(--gb) + 70px); width: min(360px, 60vw); display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+.chatbox ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; max-height: 32vh; overflow: hidden; justify-content: flex-end; }
+.chatbox li { font-size: 13.5px; line-height: 1.35; background: rgba(11, 15, 18, 0.72); border-radius: 6px; padding: 4px 8px; text-shadow: 0 1px 2px #000; overflow-wrap: anywhere; transition: opacity 0.6s; }
+.chatbox li b { margin-right: 6px; }
+.chatbox li.old { opacity: 0; }
+.chatbox.open li.old { opacity: 1; }
+.chatbox input { pointer-events: auto; font: 400 14px var(--body); color: var(--paper); background: var(--panel-solid); border: 1px solid var(--accent); border-radius: 6px; padding: 9px 10px; user-select: text; -webkit-user-select: text; }
+.micbtn { position: absolute; right: var(--gr); top: calc(var(--gt) + 34px); pointer-events: auto; font: 600 12px/1 var(--mono); color: var(--paper); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 7px 12px; cursor: pointer; }
+.micbtn.on { background: var(--ok); color: #0b140f; border-color: transparent; }
+.netchip.god { top: calc(var(--gt) + 62px); color: #14120a; background: var(--accent); border-color: transparent; font-weight: 700; }
+.owner-row { display: flex; gap: 8px; }
+.owner-row input { flex: 1; min-width: 0; font: 400 14px var(--body); color: var(--paper); background: #0c1114; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+.touch .mp-only { display: none; }
+body.mp .touch .mp-only { display: block; }

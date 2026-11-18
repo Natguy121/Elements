@@ -91,7 +91,7 @@ Every compound in `tools/compounds-source.md` (1,701 of them, plus three soaps) 
 - salts that cannot be made from anything simpler here: permanganate, dichromate, thiosulfate and similar;
 - basic organic chemicals: alcohols, a few monomers.
 
-Everything else has to be made from these, often in several steps. For example, copper hydroxide is made by dissolving copper in nitric acid and then precipitating it with sodium hydroxide. About 270 of the new compounds can be reached this way. Ask the Lab Assistant "how do I make X" and it gives the steps in order from the starting chemicals. Story Mode keeps its own rule: everything is found outside.
+A **catalyst table** by the restock lever holds manganese dioxide, yeast, sulfuric and phosphoric acid (droppers), zinc chloride, potassium dichromate and potassium permanganate. Everything else has to be made from these, often in several steps. For example, copper hydroxide is made by dissolving copper in nitric acid and then precipitating it with sodium hydroxide. About 270 of the new compounds can be reached this way. Ask the Lab Assistant "how do I make X" and it gives the steps in order from the starting chemicals. Story Mode keeps its own rule: everything is found outside.
 
 ## Lab Assistant
 

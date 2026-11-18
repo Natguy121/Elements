@@ -288,7 +288,8 @@ export function buildLab(G) {
   { const before = scene.children.length; shelving(SX1, 0.2, 4.8, [0.42, 0.95, 1.46, 1.98], -1); for (const o of scene.children.slice(before)) annex.attach(o); }
   const annexLight = new THREE.PointLight(0xfff1de, 12, 10, 2); annexLight.position.set((SX0 + SX1) / 2, H - 0.3, 2.5); annex.add(annexLight);
   { const sg = am(new THREE.PlaneGeometry(1.2, 0.26), std({ map: T.signTex(['STORAGE ROOM'], '#12202b', '#e8ecec', 640, 140, false), roughness: 0.6 }), X1 - 0.012, 2.4, 1.6); sg.rotation.y = -Math.PI / 2; sg.castShadow = false; }
-  { const sg = am(new THREE.PlaneGeometry(2.4, 0.4), std({ map: T.signTex(['SAMPLE STORAGE'], '#12202b', '#e8ecec', 1024, 170, false), roughness: 0.6 }), SX1 - 0.012, 2.55, 2.5); sg.rotation.y = -Math.PI / 2; sg.castShadow = false; }
+  const rawSign = am(new THREE.PlaneGeometry(2.4, 0.4), std({ map: T.signTex(['RAW MATERIALS'], '#12202b', '#e8ecec', 1024, 170, false), roughness: 0.6 }), SX1 - 0.013, 2.55, 2.5); rawSign.rotation.y = -Math.PI / 2; rawSign.castShadow = false;
+  const sampleSign = am(new THREE.PlaneGeometry(2.4, 0.4), std({ map: T.signTex(['SAMPLE STORAGE'], '#12202b', '#e8ecec', 1024, 170, false), roughness: 0.6 }), SX1 - 0.012, 2.55, 2.5); sampleSign.rotation.y = -Math.PI / 2; sampleSign.castShadow = false;
   const annexDoor = makeDoor(G, { x: X1 + 0.15, z: 1.1, a0: -Math.PI / 2, a1: -0.15, mat: std({ color: 0x66757c, roughness: 0.45 }), name: 'Storage room door' });
   annexDoor.show(false);
   fixtures.push(annexDoor.fixture);
@@ -298,6 +299,7 @@ export function buildLab(G) {
     if (phys.world.bodies.includes(eastFull.body)) phys.world.removeBody(eastFull.body);
     for (const e of eastSplit) if (!phys.world.bodies.includes(e.body)) phys.world.addBody(e.body);
     annex.visible = true; annexDoor.show(true); soonSign.visible = !on; exitSign.visible = on;
+    rawSign.visible = !on; sampleSign.visible = on; catSign.visible = !on;
     door.set(false); annexDoor.set(false);
   }
   updaters.push((dt) => { door.update(dt); annexDoor.update(dt); });
@@ -307,6 +309,11 @@ export function buildLab(G) {
   const lever = cyl(0.012, 0.012, 0.2, M.red, rs.x + 0.08, rs.y, rs.z, 8); lever.rotation.z = 1.2;
   mesh(new THREE.PlaneGeometry(0.5, 0.16), std({ map: T.signTex(['RESTOCK LAB'], '#ffc21a', '#111111', 512, 150, false), roughness: 0.6 }), X0 + 0.013, 1.62, 3.6, false).rotation.y = Math.PI / 2;
   fixtures.push({ pos: V(rs.x + 0.1, rs.y, rs.z), r: 0.22, name: 'Restock', hint: () => 'Restock: fresh supplies and clean glassware', use: () => { lever.rotation.z = lever.rotation.z > 0 ? -1.2 : 1.2; G.hooks.restock(); } });
+  // catalyst table (Normal Mode): the things that speed reactions up without being used up
+  const CT = { x: X0 + 0.55, z: 4.1 };
+  block(0.62, 0.05, 1.3, M.top, CT.x, BENCH - 0.025, CT.z);
+  for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) deco(0.04, BENCH - 0.05, 0.04, M.darkSteel, CT.x + a * 0.27, (BENCH - 0.05) / 2, CT.z + b * 0.6);
+  const catSign = mesh(new THREE.PlaneGeometry(0.6, 0.16), std({ map: T.signTex(['CATALYSTS'], '#ffc21a', '#111111', 512, 140, false), roughness: 0.6 }), X0 + 0.013, 1.25, CT.z + 0.35, false); catSign.rotation.y = Math.PI / 2;
   // signs, extinguisher, clock
   mesh(new THREE.PlaneGeometry(0.7, 0.35), std({ map: T.signTex(['ADD ACID', 'TO WATER'], '#ffc21a', '#111111'), roughness: 0.6 }), 1.6, 2.35, Z0 + 0.014, false);
   mesh(new THREE.PlaneGeometry(0.7, 0.35), std({ map: T.signTex(['REACTIVE METALS:', 'TONGS ONLY'], '#c8201c', '#ffffff'), roughness: 0.6 }), X0 + 0.013, 2.45, -2.9, false).rotation.y = Math.PI / 2;
@@ -408,6 +415,14 @@ export function buildLab(G) {
     m.place(m.makeProp('crate'), 5.9, 0, 2.2, 0.2); m.place(m.makeProp('crate'), 5.9, 0.37, 2.2, -0.1); m.place(m.makeProp('crateS'), 5.3, 0, 2.0, 0.5);
     m.place(m.makeProp('crateS'), 0.2, 0, 2.6, 0.3);
     m.place(m.makeProp('gascyl'), 6.4, 0, 4.2); m.place(m.makeProp('barrel'), 5.5, 0, 4.2);
+    // the catalyst table
+    [['manganese_dioxide', 'jar', 'Speeds up peroxide splitting'], ['yeast', 'jar', 'Catalase enzyme'], ['sulfuric_acid', 'dropper', 'Esters, ethers, dehydration'], ['phosphoric_acid', 'dropper', 'Alkenes and alcohols'], ['zinc_chloride', 'jar', 'Haloalkanes'], ['potassium_dichromate', 'jar', 'Oxidising alcohols'], ['potassium_permanganate', 'jar', 'Strong oxidiser']].forEach(([id, type, note], i) => {
+      const s = SUB[id]; if (!s) return;
+      const it = m.makeVessel(type, { label: s.name, formula: note, tags: [...(s.tags || [])], accent: '#ffc21a' });
+      if (type === 'dropper') { m.fill(it, id, 0.08); } else m.fill(it, id, Math.min(0.4, 40 / s.M));
+      m.place(it, CT.x + (i % 2 ? 0.13 : -0.13), BENCH, CT.z - 0.5 + i * 0.16, Math.PI / 2);
+      it.info = s;
+    });
     // the stockroom: the starting chemicals everything else is made from
     STOCK.forEach((id, i) => {
       const s = SUB[id], lvl = Math.floor(i / 11), k = i % 11;

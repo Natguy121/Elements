@@ -1,4 +1,4 @@
-import { SUB, RX, stateAt } from './db.js';
+import { SUB, RX, RXI, RX_BY_INPUT, stateAt } from './db.js';
 
 // The reaction engine. Given a mixture and its surroundings it advances every reaction whose
 // conditions are met, by real stoichiometry, and reports what happened. It knows nothing about
@@ -11,7 +11,12 @@ const DEF_Q10 = 2, REF_T = 25;
 export function stepMixture(mix, dt, env = {}) {
   const events = [];
   const air = env.open === false ? 0 : (env.air ?? 1);
-  for (const rx of RX) {
+  // only reactions whose ingredients are actually here (plus anything still burning)
+  const cand = new Set();
+  for (const id in mix.n) { const l = RX_BY_INPUT[id]; if (l) for (const r of l) cand.add(r); }
+  for (const id in mix.burning) if (RXI[id]) cand.add(RXI[id]);
+  const list = [...cand].sort((a, b) => a.idx - b.idx);
+  for (const rx of list) {
     if (rx.phase === 'gas') continue;
     const cond = rx.conditions || {};
     const latched = rx.sustain && mix.burning[rx.id];

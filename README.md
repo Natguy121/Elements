@@ -69,11 +69,28 @@ The rock pick also crushes lumps to powder, on the ground or inside a container.
 
 Sleeping in your bed regrows the forest and restocks the kitchen. Only findable materials are in Story Mode: nothing synthetic, radioactive or restricted.
 
+## 1,700 compounds
+
+Every compound in `tools/compounds-source.md` (1,701 of them, plus three soaps) is in the game: in the Discovery Book, the Lab Assistant and, where it makes sense, the chemistry. `tools/gen-compounds.mjs` turns the list into data:
+
+- `data/compounds.json`: about 1,600 new substances with molar mass, state, colour, solubility (from the textbook solubility rules), acid and base strength, hazards and a short fact. 97 entries the game already had, such as halite, calcite and quicklime, became extra names for existing substances.
+- `data/reactions-gen.json`: about 1,400 reactions made from real chemistry rules, so most compounds can be made several ways:
+  - **Salts:** neutralisation, acid with metal, acid with carbonate, acid with metal oxide, precipitation, metal with non-metal, displacement.
+  - **Breaking down and adding water:** thermal decomposition, water of crystallisation, oxides with water.
+  - **Metals and elements:** smelting metals with carbon; making chlorine, bromine, iodine, oxygen and nitrogen; chromate and dichromate; nitrides, carbide and acetylene.
+  - **Organic:** esters, soap, oxidising alcohols, dehydrating alcohols to alkenes, haloalkanes, amines, amides, ethers, fermentation, splitting sugars, polymers and combustion.
+
+  Every equation is balanced by solving for its coefficients, and the tests check atoms and mass for all of them.
+- **Not makeable:** medicines and natural products (drugs, alkaloids, vitamins and so on) are in the book for reference only. Explosives, chemical weapons and very toxic chemicals (cyanides, arsenic, thallium, cadmium, azides, perchlorates and similar) cannot be made or ordered.
+- **Real-world origin:** compounds that real labs buy rather than make, such as hydrocarbons from oil and minerals from mines, say where they really come from.
+
+**Chemical supply (Normal Mode).** A terminal on the west wall (F) opens a catalogue of about 1,260 chemicals. Orders arrive on the cart below it. Gases, medicines and banned chemicals cannot be ordered. Story Mode keeps the rule that everything is found, so the terminal is closed there.
+
 ## Lab Assistant
 
 Press **T** (or Ask on touch) to chat with the Lab Assistant, a small offline helper built into the page. It needs no internet and no AI service.
 
-- It stores over 3,700 questions with answers, generated from the game's own data (every reaction, substance, element, discovery, material and goal) plus written answers on how to play and basic chemistry ideas.
+- It stores over 50,000 questions with answers, generated from the game's own data (every reaction, substance, element, discovery, material and goal) plus written answers on how to play and basic chemistry ideas.
 - "What does A and B make?" and "How do I make X?" are worked out directly from the reaction rules, with the equation, the conditions (heat, flame, catalyst, powder) and the science.
 - Anything else is matched to the closest stored question by word overlap (TF-IDF).
 - It only knows this game. It is not a general chatbot.
@@ -116,7 +133,7 @@ Pick Student or Discovery on the title screen (switch any time in the pause menu
 
 Unit tests check every reaction for atom and mass balance.
 
-Normal Mode has 34 reactions and Story Mode adds 7 more. Foaming reactions push foam out of the container as a rising column that topples into mounds on the bench; add dish soap for the full eruption. They include:
+The original set has 41 hand-written reactions; the compound expansion adds about 1,400 more (below). Foaming reactions push foam out of the container as a rising column that topples into mounds on the bench; add dish soap for the full eruption. They include:
 - baking soda and vinegar
 - sodium, potassium, lithium and calcium in water
 - elephant toothpaste
@@ -182,6 +199,8 @@ Every locked element already has a real source mineral, a processing method and 
 | `js/physics/` | cannon-es world and the grab system |
 | `js/matter/` | Containers, lumps, props, pouring, spills, breakage (`items.js`), gas clouds and explosions (`gas.js`), and the simulation loop tying heat, reactions and effects together (`sim.js`) |
 | `js/world/` | The lab room and its fixtures, the Story Mode outdoors (`outdoors.js`), doors, and all canvas-painted textures |
+| `tools/gen-compounds.mjs`, `data/compounds.json`, `data/reactions-gen.json`, `data/stock.json` | The 1,700-compound expansion |
+| `js/ui/supply.js` | The chemical supply catalogue |
 | `js/assistant.js`, `js/ui/ask.js` | The offline Lab Assistant and its chat window |
 | `js/net.js` | Multiplayer: room codes, host snapshots, guest input, avatars |
 | `js/story.js`, `js/story-data.js`, `data/materials.json` | Story Mode: gathering, storage and saving, goals, unlocks, the 18 materials |

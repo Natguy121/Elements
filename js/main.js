@@ -4,7 +4,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { SUB, DISC, RXI, RX, canReact } from './chem/db.js';
+import { SUB, DISC, RXI, RX, canReact, equationOf } from './chem/db.js';
 import { ELEMENTS } from './chem/formula.js';
 import { Mixture } from './chem/mixture.js';
 import { createPhysics, G_STATIC, G_PROP } from './physics/world.js';
@@ -22,6 +22,7 @@ import { createHud, TOOLS } from './ui/hud.js';
 import { createStory, storyDefaults } from './story.js';
 import { createNet } from './net.js';
 import { createAsk } from './ui/ask.js';
+import { createSupply } from './ui/supply.js';
 
 const $ = (id) => document.getElementById(id);
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -82,13 +83,14 @@ function boot() {
 
   // ---------- hooks used by the simulation ----------
   const MYSTERY_A = ['Regrettable', 'Suspicious', 'Unlabelled', 'Ominous', 'Lukewarm', 'Questionable', 'Sticky', 'Forbidden'], MYSTERY_B = ['Sludge', 'Soup', 'Gloop', 'Broth', 'Slurry', 'Cocktail', 'Paste', 'Mistake'];
-  G.hooks.discover = (id, holder) => {
+  G.hooks.discover = (id, holder, rxHit) => {
     if (G.story && id.startsWith('sub_') && SUB[id.slice(4)]) story.addEl(SUB[id.slice(4)].el);
     const d = DISC[id];
     if (!d) return;
     const P = G.prog, rec = P.found[id];
     if (rec) { if (G.time - (rec.last || -99) > 25) { rec.n++; rec.last = G.time; persist(); } return; }
     P.found[id] = { t: Date.now(), by: 'You', n: 1, last: G.time };
+    if (rxHit && rxHit.gen && id.startsWith('rx_gen_')) { const rx = rxHit; hud.banner({ ...d, eq: equationOf(rx), kind: rx.kind, name: rx.name }); P.log.push({ t: Date.now(), text: `Discovered: ${rx.name} (${d.name.toLowerCase()}).` }); persist(); return; }
     const extra = id === 'mystery' ? `${MYSTERY_A[Math.floor(Math.random() * 8)]} ${MYSTERY_B[Math.floor(Math.random() * 8)]} No. ${1 + Math.floor(Math.random() * 98)}` : null;
     hud.banner(d, extra);
     P.log.push({ t: Date.now(), text: `Discovered: ${extra || d.name}${holder && holder.name ? ' (in ' + holder.name.toLowerCase() + ')' : ''}.` + (G.story && d.fact ? ' ' + d.fact.split('. ')[0].replace(/\.$/, '') + '.' : '') });
@@ -349,7 +351,7 @@ function boot() {
   function inspectInfo(it) {
     const rows = [], mix = it.mix;
     let name = it.name, formula = '', tags = [], fact = it.def && it.def.fact;
-    if (it.kind === 'lump') { const s = SUB[it.mix.dominant() || it.sub]; formula = s.formula; tags = s.tags || []; fact = s.fact; rows.push(['State', mix.T > (s.mp ?? 1e9) ? 'liquid' : 'solid'], ['Density', s.density + ' g/cm³'], ['Melts', (s.mp ?? '?') + ' °C']); if (s.z) rows.unshift(['Element', '#' + s.z]); }
+    if (it.kind === 'lump') { const s = SUB[it.mix.dominant() || it.sub]; formula = s.formula; tags = s.tags || []; fact = s.fact; rows.push(['State', mix.T > (s.mp ?? 1e9) ? 'liquid' : 'solid'], ['Density', s.est ? '?' : s.density + ' g/cm³'], ['Melts', s.est || s.mp === null || s.mp === undefined ? '?' : s.mp + ' °C']); if (s.z) rows.unshift(['Element', '#' + s.z]); }
     else if (it.kind === 'vessel') {
       const a = mix.analyse();
       rows.push(['Holds', (it.def.cap * 1000).toFixed(0) + ' mL to the brim'], ['Contents', a.total > 0 ? (a.total * 1000).toFixed(a.total < 0.01 ? 1 : 0) + ' mL' : 'empty']);
@@ -445,9 +447,12 @@ function boot() {
   function openPause() { uiOpen = true; input.st.enabled = false; hud.openPause(); }
   function openBook(tab) { uiOpen = true; input.st.enabled = false; input.unlock(); hud.openBook(tab); }
   const askUI = createAsk(() => { if (state === 'play') G.hooks.resume(); });
+  const supplyUI = createSupply(G, () => { if (state === 'play') G.hooks.resume(); });
+  G.hooks.openSupply = () => { if (net.guest) { hud.toast('Chemical supply', 'Only the host can order chemicals.'); return; } uiOpen = true; input.st.enabled = false; input.unlock(); supplyUI.open(); play('ui'); };
   function uiKeys() {
     if (state !== 'play') return;
     if (askUI.isOpen) { if (input.hit('Escape')) askUI.close(); return; }
+    if (supplyUI.isOpen) { if (input.hit('Escape')) supplyUI.close(); return; }
     if (input.hit('KeyT') && !hud.bookOpen && !hud.pauseOpen) { uiOpen = true; input.st.enabled = false; input.unlock(); askUI.open(); play('ui'); return; }
     if (input.hit('KeyH') && (G.story || G.settings.mode !== 'discovery') && !hud.bookOpen && !hud.pauseOpen) { hud.guide(); play('ui'); }
     if (input.hit('KeyZ') && !hud.bookOpen && !hud.pauseOpen) {
@@ -567,7 +572,7 @@ function boot() {
 
   // ---------- main loop ----------
   const dbg = { maxDt: 0.05, speed: 1, freeze: false };
-  window.__lab = { G, grab, matter, sim, gas, lab, player, input, dbg, findTarget, primary, story, startMode, askUI, get net() { return net; }, selectTool: (t) => { tool = t; refreshTool(); }, state: () => state };
+  window.__lab = { G, grab, matter, sim, gas, lab, player, input, dbg, findTarget, primary, story, startMode, askUI, supplyUI, get net() { return net; }, selectTool: (t) => { tool = t; refreshTool(); }, state: () => state };
   let last = performance.now(), slow = 0, frames = 0;
   // one step of the whole game, without drawing it (tests call this directly to run fast)
   function step(dt) {

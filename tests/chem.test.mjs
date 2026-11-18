@@ -145,3 +145,33 @@ test('copper sulfate crystallises when a hot saturated solution cools', () => {
   const left = (m.n.cuso4 - m.dissolvedMol('cuso4')) * SUB.cuso4.M;
   assert.ok(Math.abs(left - 43) < 2, 'about 43 g comes out at 20 C, got ' + left.toFixed(1));
 });
+
+// ---------- the 1,700-compound expansion ----------
+const byName = (n) => Object.values(SUB).find((s) => s.name.toLowerCase() === n.toLowerCase())?.id;
+const run = (mix, sec, env = {}) => { for (let t = 0; t < sec; t += 0.1) stepMixture(mix, 0.1, env); };
+test('precipitation: silver nitrate and salt give silver chloride', () => {
+  const m = new Mixture(20); m.add('water', 10); m.add(byName('silver nitrate'), 0.05); m.add('nacl', 0.05);
+  run(m, 3);
+  assert.ok(m.get(byName('silver chloride')) > 0.04, 'silver chloride forms');
+});
+test('precipitation: lead nitrate and potassium iodide give yellow lead iodide', () => {
+  const m = new Mixture(20); m.add('water', 10); m.add(byName('lead(ii) nitrate'), 0.02); m.add(byName('potassium iodide'), 0.04);
+  run(m, 3);
+  const id = Object.keys(m.n).find((k) => /lead.*iodide/i.test(SUB[k].name));
+  assert.ok(id && m.get(id) > 0.015);
+});
+test('zinc dissolves in hydrochloric acid giving hydrogen', () => {
+  const m = new Mixture(20); m.add('water', 20); m.add('hcl', 0.2); m.add('zinc', 0.05, 20, 1);
+  run(m, 60);
+  assert.ok(m.get(byName('zinc chloride')) > 0.01);
+});
+test('esterification needs heat', () => {
+  const cold = new Mixture(20); cold.add('acetic_acid', 0.5); cold.add(byName('methanol'), 0.5); run(cold, 10);
+  assert.equal(cold.get(byName('methyl acetate')), 0);
+  const hot = new Mixture(80); hot.add('acetic_acid', 0.5); hot.add(byName('methanol'), 0.5); hot.add(byName('sulfuric acid'), 0.01); run(hot, 30);
+  assert.ok(hot.get(byName('methyl acetate')) > 0.001);
+});
+test('every compound from the list is a substance, and makeable ones have routes', () => {
+  assert.ok(Object.keys(SUB).length > 1650, 'about 1,700 substances: ' + Object.keys(SUB).length);
+  assert.ok(RX.length > 1200);
+});

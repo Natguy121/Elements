@@ -69,7 +69,7 @@
 
   <section id="menu" class="screen menu">
     <div class="menu-inner">
-      <p class="eyebrow">First-person chemistry sandbox · version 3</p>
+      <p class="eyebrow">First-person chemistry sandbox · version 4</p>
       <h1 class="logo">Reaction<br>Lab</h1>
       <p class="tagline">Pick things up. Pour them together. Find out.</p>
       <div class="start">
@@ -159,6 +159,15 @@
         <div class="notes-col"><h3>Experiment log</h3><ol id="log" class="log"></ol></div>
         <div class="notes-col"><h3>Your notes</h3><textarea id="notes" placeholder="Write down what worked. Amounts and temperatures help."></textarea></div>
       </div>
+    </div>
+  </section>
+
+  <section id="supply" class="modal" hidden>
+    <div class="ask-card supply-card" role="dialog" aria-labelledby="supplyTitle">
+      <header class="ask-head"><div><h2 id="supplyTitle">Chemical supply</h2><span id="supplyCount" class="count"></span></div><button id="supplyClose" class="btn small" type="button">Close</button></header>
+      <div class="supply-tools"><input id="supplySearch" type="search" placeholder="Search by name or formula: zinc, KI, ethanol..." aria-label="Search chemicals"><div id="supplyCats" class="chips"></div></div>
+      <div id="supplyList" class="supply-list"></div>
+      <p class="supply-foot">Orders arrive on the cart under the terminal. Making things yourself is what earns discoveries.</p>
     </div>
   </section>
 

@@ -306,7 +306,16 @@ export function buildLab(G) {
   const lever = cyl(0.012, 0.012, 0.2, M.red, rs.x + 0.08, rs.y, rs.z, 8); lever.rotation.z = 1.2;
   mesh(new THREE.PlaneGeometry(0.5, 0.16), std({ map: T.signTex(['RESTOCK LAB'], '#ffc21a', '#111111', 512, 150, false), roughness: 0.6 }), X0 + 0.013, 1.62, 3.6, false).rotation.y = Math.PI / 2;
   fixtures.push({ pos: V(rs.x + 0.1, rs.y, rs.z), r: 0.22, name: 'Restock', hint: () => 'Restock: fresh supplies and clean glassware', use: () => { lever.rotation.z = lever.rotation.z > 0 ? -1.2 : 1.2; G.hooks.restock(); } });
-  // signs, extinguisher, clock
+  // chemical supply terminal (Normal Mode): order any reagent the lab knows; it arrives on the cart
+  const term = V(X0 + 0.07, 1.35, 4.45);
+  deco(0.08, 0.5, 0.4, M.darkSteel, term.x, term.y, term.z);
+  mesh(new THREE.PlaneGeometry(0.34, 0.26), new THREE.MeshBasicMaterial({ map: T.signTex(['CHEMICAL', 'SUPPLY', '— F —'], '#062014', '#43ff8a', 256, 200, false) }), X0 + 0.115, term.y + 0.02, term.z, false).rotation.y = Math.PI / 2;
+  block(0.5, 0.05, 0.6, M.steel, X0 + 0.55, 0.7, 4.4);
+  for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) deco(0.03, 0.68, 0.03, M.darkSteel, X0 + 0.55 + a * 0.22, 0.34, 4.4 + b * 0.27);
+  G.deliverySpot = { x: X0 + 0.55, y: 0.725, z: 4.4 };
+  fixtures.push({ pos: V(term.x + 0.06, term.y, term.z), r: 0.25, name: 'Chemical supply', hint: () => (G.story ? 'Closed in Story Mode: everything has to be found' : 'Order chemicals (they arrive on the cart)'), use: () => { if (G.story) { G.hud.toast('Chemical supply', 'The supply line is closed in Story Mode. Find materials outside and make the rest.'); return; } G.hooks.openSupply && G.hooks.openSupply(); } });
+
+
   mesh(new THREE.PlaneGeometry(0.7, 0.35), std({ map: T.signTex(['ADD ACID', 'TO WATER'], '#ffc21a', '#111111'), roughness: 0.6 }), 1.6, 2.35, Z0 + 0.014, false);
   mesh(new THREE.PlaneGeometry(0.7, 0.35), std({ map: T.signTex(['REACTIVE METALS:', 'TONGS ONLY'], '#c8201c', '#ffffff'), roughness: 0.6 }), X0 + 0.013, 2.45, -2.9, false).rotation.y = Math.PI / 2;
   const ext = cyl(0.07, 0.07, 0.42, M.red, 3.55, 1.0, Z0 + 0.1); void ext;

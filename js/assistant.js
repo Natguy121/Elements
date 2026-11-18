@@ -120,12 +120,12 @@ export function createAssistant() {
     Cl: 'Chlorine is made by passing electricity through salt water (electrolysis of brine).',
   };
   function getElement(e) {
-    const sid = subOfEl(e), s = sid && SUB[sid], bits = [];
+    const sid = subOfEl(e) || Object.keys(SUB).find((k) => SUB[k].formula === e.sym + '2' || SUB[k].formula === e.sym), s = sid && SUB[sid], bits = [];
     const made = sid ? RX.filter((r) => r.outputs.some((o) => o.id === sid)) : [];
     const mats = MATS.filter((m) => SUB[m.sub] && SUB[m.sub].el === e.sym);
     if (e.start) {
       if (e.state !== 'gas' && s && s.supply) bits.push(`In Normal Mode ${lc(e.name)} is on the element storage shelves (west wall of the lab).`);
-      else if (e.state === 'gas') bits.push(`${e.name} is unlocked, but you cannot hold a sample yet: gas cylinders arrive with the gas-handling update.${made.length ? '' : ''}`);
+      else if (e.state === 'gas') bits.push(`${e.name} is a gas, so you cannot hold a sample in an open container: it drifts off as a cloud.`);
       else bits.push(`${e.name} is one of the starting elements.`);
     } else bits.push(`${e.name} is locked (tier ${e.tier || '?'}). It needs equipment from a later update.`);
     if (e.start && !mats.length && e.state !== 'gas') bits.push('Story Mode: it is not found outside, so it is not available there yet.');
@@ -149,20 +149,23 @@ export function createAssistant() {
     const s = SUB[id], n = lc(s.name);
     const made = RX.filter((r) => r.outputs.some((o) => o.id === id)), used = RX.filter((r) => r.inputs.some((i) => i.id === id));
     const mat = MATS.find((m) => m.sub === id);
-    const info = `**${s.name}**${s.formula ? ' (' + s.formula + ')' : ''}: ${s.fact || ''} At room temperature it is a ${s.state === 's' ? 'solid' : s.state === 'l' ? 'liquid' : 'gas'}${s.mp !== undefined && s.mp !== null ? `, melting at ${s.mp} °C` : ''}${s.bp !== undefined && s.bp !== null ? ` and boiling at ${s.bp} °C` : ''}.`;
+    const info = `**${s.name}**${s.formula ? ' (' + s.formula + ')' : ''}: ${s.fact || ''} At room temperature it is a ${s.state === 's' ? 'solid' : s.state === 'l' ? 'liquid' : 'gas'}${!s.est && s.mp !== undefined && s.mp !== null ? `, melting at ${s.mp} °C` : ''}${!s.est && s.bp !== undefined && s.bp !== null ? ` and boiling at ${s.bp} °C` : ''}.${s.aka ? ' Also called: ' + s.aka.join(', ') + '.' : ''}`;
     put('sub:' + id, 'about', [`what is ${n}`, `tell me about ${n}`, `${n}`], info); about[id] = info;
     if (s.formula) put('sub:' + id, 'formula', [`what is the formula of ${n}`, `formula for ${n}`], `${s.name} is ${s.formula}.`);
     put('sub:' + id, 'danger', [`is ${n} dangerous`, `is ${n} safe to touch`], (s.tags || []).length ? `${s.name} is tagged ${list((s.tags || []).map((t) => t.replace(/_/g, ' ')))}. ${s.handle === 'tongs' ? 'Use tongs (1): it burns bare skin.' : 'Handle it carefully.'}` : `${s.name} is not hazardous in the game.`);
     put('sub:' + id, 'react', [`what reacts with ${n}`, `what can I mix with ${n}`, `what can I do with ${n}`], used.length ? `${s.name} is used in: ${used.map((r) => r.name + ' (with ' + list([...r.inputs.filter((i) => i.id !== id && i.from !== 'air').map((i) => lc(SUB[i.id].name)), ...(r.inputs.some((i) => i.from === 'air') ? ['air'] : [])]) + ')').join('; ')}.` : `Nothing in the game reacts with ${n} yet, but it can still dissolve, melt or boil.`);
     // reactions that need the thing itself to start are not a way to get it
-    const realMade = made.filter((r) => !r.inputs.some((i) => (SUB[i.id].name.toLowerCase().includes(n) || n.includes(SUB[i.id].name.toLowerCase())) && i.id !== id) || r.inputs.some((i) => i.id === id));
+    const ORDER = ['neutral', 'metal_acid', 'carbonate_acid', 'oxide_acid', 'precip', 'synth', 'smelt', 'halogen', 'ester', 'org_oxidise', 'decomp', 'oxidise'];
+    const rank = (r) => { const f = (r.discovery || '').replace('rx_gen_', ''); const i = ORDER.indexOf(f); return r.gen ? (i < 0 ? 50 : i) : -1; };
+    const realMade = [...made, ...(id === 'soap' ? RX.filter((r) => r.discovery === 'rx_gen_soap') : [])].filter((r) => !r.inputs.some((i) => i.id !== id && SUB[i.id].name.toLowerCase().includes(n))).sort((a, b) => rank(a) - rank(b));
     const loop = made.filter((r) => !realMade.includes(r));
     const getIt = [`**How to get ${n}${(EXTRA_ALIASES[id] || [])[0] && !n.includes(EXTRA_ALIASES[id][0]) ? ' (' + EXTRA_ALIASES[id][0] + ')' : ''}.**`,
       id === 'water' ? 'Normal Mode: turn on the cold tap at the sink (F), or use the distilled water bottle on the island bench.' : WHERE[id] ? `Normal Mode: it is ${SPOT[WHERE[id]]}.` : s.supply ? 'Normal Mode: it is on the lab shelves.' : '',
       mat ? `Story Mode: ${mat.where}${/kitchen/i.test(mat.how) ? '' : ' (' + lc(mat.how) + ').'}` : WHERE[id] || s.supply ? `Story Mode: it cannot be found outside, so it is not available there yet.` : '',
-      realMade.length && id !== 'water' ? `${WHERE[id] || mat ? 'You can also make it' : 'Make it'}: ${realMade.slice(0, 2).map((r) => `${r.name}. ${how(r)}`).join(' Or: ')}${realMade.length > 2 ? ` (and ${realMade.length - 2} more ways)` : ''}` : '',
+      realMade.length && id !== 'water' ? `${WHERE[id] || mat ? 'You can also make it' : realMade.length > 1 ? `There are ${realMade.length} ways to make it` : 'Make it'}:\n` + realMade.slice(0, 4).map((r, k) => `${k + 1}. **${r.name}**: ${how(r)}`).join('\n') + (realMade.length > 4 ? `\n...and ${realMade.length - 4} more (ask "what makes ${n}").` : '') : '',
       loop.length ? `(${loop.map((r) => r.name).join(', ')} only turns another form of ${n} back into ${n}, so you need some to start with.)` : '',
-      !made.length && !s.supply && !mat ? 'It cannot be made in the game yet.' : ''].filter(Boolean).join(' ');
+      !realMade.length && !s.supply && !mat ? (s.fact && /reference|dangerous|cannot be made|In real life/.test(s.fact) ? s.fact.replace(/^.*?Category: [^.]*\.\s*/, '') : 'It cannot be made in the game yet.') : '',
+      !realMade.length && !s.supply && !mat && !s.banned && !s.reference ? '' : ''].filter(Boolean).join(' ');
     put('sub:' + id, 'get', [`how do I make ${n}`, `how to get ${n}`, `where does ${n} come from`, `where do I find ${n}`], getIt);
     put('sub:' + id, 'dissolve', [`does ${n} dissolve in water`, `is ${n} soluble`], s.sol ? `Yes: about ${s.sol} g dissolves in 100 g of water at 20 °C${s.solHot !== undefined ? `, and ${s.solHot} g when hot, so it crystallises as it cools` : ''}.` : s.state === 's' ? `No, ${n} does not dissolve in water.` : `${s.name} is a ${s.state === 'l' ? 'liquid' : 'gas'}.`);
   }
@@ -262,7 +265,7 @@ export function createAssistant() {
   function ask(raw) {
     const q = norm(raw);
     if (!q) return { a: 'Ask me anything about the lab: what two things make, how to make something, where to find a material...' };
-    for (const [re, name, real] of NOT_IN_GAME) if (re.test(q) && !findSubs(q.replace(re, ' ')).length) return { a: `**${name}** is not in the game yet, so you cannot make it in the lab. In the real world: ${real}`, related: ['what can I make', 'how do I make glass'] };
+    for (const [re, name, real] of NOT_IN_GAME) if (re.test(q) && !findSubs(q).length) return { a: `**${name}** is not in the game yet, so you cannot make it in the lab. In the real world: ${real}`, related: ['what can I make', 'how do I make glass'] };
     const subs = findSubs(q);
     // one thing asked about: work out what kind of question it is, then answer exactly that
     const words = q.split(' ');

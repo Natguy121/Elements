@@ -8,7 +8,7 @@ import { MATS, GOALS, UNLOCKS } from '../story-data.js';
 // the Discovery Book with its periodic table and notebook, and the pause/settings panel.
 
 const $ = (id) => document.getElementById(id);
-const CATS = ['Elements', 'Compounds', 'Gases', 'Acids & Bases', 'Salts', 'Metals & Alloys', 'Glass & Ceramics', 'Materials', 'Fireworks & Light', 'Inventions', 'Reactions', 'Observations', 'Mystery Mixtures', 'Secrets'];
+const CATS = ['Elements', 'Molecules', 'Compounds', 'Gases', 'Acids & Bases', 'Salts', 'Oxides', 'Complexes', 'Organic compounds', 'Food & Life', 'Medicines', 'Natural products', 'Minerals', 'Pigments & Dyes', 'Metals & Alloys', 'Glass & Ceramics', 'Materials', 'Fireworks & Light', 'Inventions', 'Reactions', 'Observations', 'Mystery Mixtures', 'Secrets'];
 export const TOOLS = [
   { id: 'tongs', key: '1', name: 'Tongs' }, { id: 'spatula', key: '2', name: 'Spatula' }, { id: 'pipette', key: '3', name: 'Pipette' },
   { id: 'thermo', key: '4', name: 'Thermometer' }, { id: 'ext', key: '5', name: 'Extinguisher' },

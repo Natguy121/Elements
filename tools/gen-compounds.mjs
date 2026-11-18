@@ -157,7 +157,7 @@ const ionKey = (ca, an, w = 0) => `${ca.f}${ca.z}|${an.f}|${w}`;
 const salts = new Map(); // ion key -> id
 for (const p of pool.values()) if (p.ions && !p.banned) { const k = ionKey(p.ions.cat, p.ions.an, p.ions.w); if (!salts.has(k) || SUBS.get(p.id).supply) salts.set(k, p.id); }
 const salt = (ca, an, w = 0) => (ca && an ? salts.get(ionKey(ca, an, w)) : undefined);
-const elementId = { Li: 'lithium', Na: 'sodium', K: 'potassium', Mg: 'magnesium', Ca: 'calcium', Al: 'aluminium', Fe: 'iron', Cu: 'copper', Au: 'gold', Hg: 'mercury', Zn: 'zinc', Sn: 'tin', Pb: 'lead', Ni: 'nickel', Ag: 'silver', Mn: 'manganese', Cr: 'chromium', Co: 'cobalt', Ba: 'barium', Sr: 'strontium' };
+const elementId = { Bi: 'bismuth', Pt: 'platinum', Li: 'lithium', Na: 'sodium', K: 'potassium', Mg: 'magnesium', Ca: 'calcium', Al: 'aluminium', Fe: 'iron', Cu: 'copper', Au: 'gold', Hg: 'mercury', Zn: 'zinc', Sn: 'tin', Pb: 'lead', Ni: 'nickel', Ag: 'silver', Mn: 'manganese', Cr: 'chromium', Co: 'cobalt', Ba: 'barium', Sr: 'strontium' };
 const NEW_ELEMENTS = [
   { id: 'zinc', name: 'Zinc', el: 'Zn', cp: 25.4, color: '#a8b0b8', look: 'metal', cat: 'Elements', supply: true, fact: 'Zinc coats steel to stop it rusting (galvanising). It reacts steadily with acids, giving off hydrogen.' },
   { id: 'tin', name: 'Tin', el: 'Sn', cp: 27, color: '#c4c6c8', look: 'metal', cat: 'Elements', supply: true, fact: 'A bar of tin "cries": it crackles when bent as its crystals slide past each other.' },
@@ -168,14 +168,16 @@ const NEW_ELEMENTS = [
   { id: 'chromium', name: 'Chromium', el: 'Cr', cp: 23.4, color: '#c9d0d8', look: 'metal', cat: 'Elements', supply: true, fact: 'Chromium gives stainless steel its shine and its resistance to rust.' },
   { id: 'cobalt', name: 'Cobalt', el: 'Co', cp: 24.8, color: '#a7aab0', look: 'metal', cat: 'Elements', supply: true, fact: 'Cobalt compounds give glass and pottery their deep blue.' },
   { id: 'barium', name: 'Barium', el: 'Ba', cp: 28.1, color: '#c8c6be', look: 'metal', handle: 'tongs', store: 'oil', tags: ['water_reactive'], cat: 'Elements', supply: true, fact: 'Barium burns with an apple-green flame, used in green fireworks.' },
+  { id: 'platinum', name: 'Platinum', el: 'Pt', cp: 25.9, color: '#d8d6d0', look: 'metal', cat: 'Elements', supply: true, fact: 'Platinum is a superb catalyst: ammonia and oxygen burn on a red-hot platinum gauze to make nitric oxide, the first step to nitric acid.' },
+  { id: 'bismuth', name: 'Bismuth', el: 'Bi', cp: 25.5, color: '#d8c8d0', look: 'metal', cat: 'Elements', supply: true, fact: 'Bismuth grows into rainbow-coloured staircase crystals when it cools from a melt.' },
   { id: 'strontium', name: 'Strontium', el: 'Sr', cp: 26.4, color: '#d8d0b8', look: 'metal', handle: 'tongs', store: 'oil', tags: ['water_reactive'], cat: 'Elements', supply: true, fact: 'Strontium burns crimson red: it is the red in fireworks and flares.' },
 ];
 for (const s of NEW_ELEMENTS) pool.set(s.id, { id: s.id, name: s.name, c: { [s.el]: 1 }, ions: null });
 const has = (id) => id && pool.has(id) && !pool.get(id).banned;
 const byName = new Map();
-for (const p of pool.values()) { byName.set(p.name.toLowerCase().replace(/\(.*?\)/g, '').trim(), p.id); const alt = /\(([^)]+)\)/.exec(p.name); if (alt && !/^[a-z0-9,-]{1,6}$/i.test(alt[1])) byName.set(alt[1].toLowerCase().trim(), p.id); }
+for (const p of pool.values()) { byName.set(p.name.toLowerCase().trim(), p.id); byName.set(p.name.toLowerCase().replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim(), p.id); const alt = /\(([^)]+)\)/.exec(p.name); if (alt && !/^[a-z0-9,-]{1,6}$/i.test(alt[1])) byName.set(alt[1].toLowerCase().trim(), p.id); }
 for (const id in aliasOf) for (const n of aliasOf[id]) byName.set(n.toLowerCase().replace(/\(.*?\)/g, '').trim(), id);
-const named = (...names) => { for (const n of names) { const id = byName.get(n.toLowerCase()); if (has(id)) return id; } return null; };
+const named = (...names) => { for (const n of names) { if (!n) continue; const k = n.toLowerCase().trim(); for (const key of [k, k.replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim()]) { const id = byName.get(key); if (has(id)) return id; } } return null; };
 
 const ACID = { HSO4: named('sulfuric acid'), H2PO4: named('phosphoric acid'), HPO4: named('phosphoric acid'), Cl: 'hcl', Br: named('hydrobromic acid'), I: named('hydroiodic acid'), NO3: named('nitric acid'), SO4: named('sulfuric acid'), PO4: named('phosphoric acid'), C2H3O2: 'acetic_acid', CHO2: named('formic acid'), NO2: null, CO3: null, S: null, SO3: null };
 const ACID_H = { Cl: 1, Br: 1, I: 1, NO3: 1, SO4: 2, PO4: 3, C2H3O2: 1, CHO2: 1 };
@@ -501,7 +503,7 @@ for (const e of out) {
     const stem = m[2];
     const acid = N(stem.replace(/ate$/, 'ic acid'), stem.replace(/oate$/, 'oic acid'), stem === 'acetate' ? 'acetic acid' : '', { stearate: 'stearic acid', oleate: 'oleic acid', palmitate: 'palmitic acid', laurate: 'lauric acid', butyrate: 'butyric acid', propionate: 'propionic acid', benzoate: 'benzoic acid', salicylate: 'salicylic acid', citrate: 'citric acid', lactate: 'lactic acid', formate: 'formic acid', oxalate: 'oxalic acid', tartrate: 'tartaric acid', sorbate: 'sorbic acid', glutamate: '' }[stem] || '');
     const acidId = stem === 'acetate' ? 'acetic_acid' : stem === 'citrate' ? 'citric' : acid;
-    if (!acidId || !pool.get(acidId) || pool.get(acidId).ions) continue;
+    if (!acidId || !pool.get(acidId) || pool.get(acidId).ions || !pool.get(acidId).c.C) continue; // only weak organic acids are freed this way
     rx('Acid displacement', 'weak_acid', [p.id, 'hcl'], [acidId, m[1] === 'sodium' ? 'nacl' : N('potassium chloride')], { target: acidId, water: true, dH: -5, rate: { k: 3 }, name: `${nameOf(acidId)} from ${p.name.toLowerCase()} and hydrochloric acid` });
   }
   // more oxidations, by stem
@@ -533,15 +535,445 @@ for (const e of out) {
   R('Esterification', 'ester', [['benzoic acid'], ['methanol']], [['methyl benzoate'], WATER], { target: N('methyl benzoate'), dH: -5, cond: { minTemp: 60 }, rate: { k: 0.003 }, cat: ACID.SO4 ? [{ id: ACID.SO4, boost: 20 }] : undefined });
   R('Esterification', 'ester', [['salicylic acid'], ['methanol']], [['methyl salicylate'], WATER], { target: N('methyl salicylate'), dH: -5, cond: { minTemp: 60 }, rate: { k: 0.003 }, cat: ACID.SO4 ? [{ id: ACID.SO4, boost: 20 }] : undefined, name: 'Oil of wintergreen (methyl salicylate)' });
 }
+// ---------- gases and industry: catalysts make gases react before they escape ----------
+{
+  const N = (...n) => named(...n);
+  // ins/outs: substance names or ids; '@o2' and '@n2' come from the air
+  function I(kind, fam, ins, outs, o = {}) {
+    const res = (x) => (x === '@o2' ? O2 : x === '@n2' ? N('nitrogen gas', 'nitrogen') : pool.has(x) ? x : N(x));
+    const a = ins.map(res), b = outs.map(res);
+    if (![...a, ...b].every(has)) return;
+    if (b.some((id) => pool.get(id).banned)) return;
+    const bal = balance(a, b);
+    if (!bal) return;
+    const airIds = new Set(ins.map((x, k) => (x.startsWith('@') ? a[k] : null)).filter(Boolean));
+    const cat = (o.cat || []).map((c) => (typeof c === 'string' ? { id: res(c), boost: 30 } : { ...c, id: res(c.id) })).filter((c) => has(c.id));
+    if (o.cat && o.cat.length && !cat.length) return; // needs a catalyst the game does not have
+    const r = { id: 'g_' + fam + '_' + RXS.length, name: o.name || `${nameOf(b[0])} from ${a.filter((x) => !airIds.has(x)).map((x) => nameOf(x).toLowerCase()).join(' and ')}`, kind, inputs: bal.ins.map((x) => (airIds.has(x.id) ? { ...x, from: 'air' } : x)), outputs: bal.outs, enthalpy_kJ: o.dH ?? -80, rate: o.rate || { k: cat.length ? 0.0005 : 0.05 }, effects: o.fx || [], discovery: 'rx_gen_' + fam, gen: true };
+    if (cat.length) r.catalysts = cat;
+    if (o.minTemp !== undefined || o.maxTemp !== undefined) r.conditions = { ...(o.minTemp !== undefined ? { minTemp: o.minTemp } : {}), ...(o.maxTemp !== undefined ? { maxTemp: o.maxTemp } : {}) };
+    if (o.water) r.requires = [{ id: WATER }];
+    RXS.push(r);
+    for (const x of bal.outs) madeBy.set(x.id, (madeBy.get(x.id) || 0) + 1);
+  }
+  const C = (id, boost = 400) => ({ id, boost }); // a catalyst that makes an otherwise very slow reaction go
+  const V2O5 = 'vanadium(v) oxide', PT = 'platinum', NI = 'nickel', FE = 'iron', ALCL3 = 'aluminum chloride', FECL3 = 'iron(iii) chloride';
+  // contact process and nitric acid
+  I('Catalytic oxidation', 'contact', ['so2', '@o2'], ['sulfur trioxide'], { cat: [C(V2O5)], minTemp: 400, dH: -198, name: 'Contact process: sulfur dioxide to sulfur trioxide (vanadium oxide catalyst)' });
+  I('Catalytic synthesis', 'haber', ['@n2', 'h2'], ['ammonia'], { cat: [C(FE, 300)], minTemp: 400, dH: -92, name: 'Haber process: nitrogen and hydrogen to ammonia (iron catalyst)' });
+  I('Catalytic oxidation', 'ostwald', ['ammonia', '@o2'], ['nitric oxide', WATER], { cat: [C(PT, 600)], minTemp: 700, dH: -905, fx: [{ fx: 'glow', color: '#ff7a2a' }], name: 'Ostwald process: ammonia burns on platinum to nitric oxide' });
+  I('Oxidation', 'ostwald', ['nitric oxide', '@o2'], ['nitrogen dioxide'], { rate: { k: 0.3 }, dH: -114, fx: [{ fx: 'smoke', amount: 0.3, color: '#a8501e' }], name: 'Nitric oxide turns brown in air (nitrogen dioxide)' });
+  I('Absorption', 'ostwald', ['nitrogen dioxide', '@o2', WATER], ['nitric acid'], { rate: { k: 0.3 }, dH: -100, name: 'Nitrogen dioxide in water makes nitric acid' });
+  I('Synthesis', 'gas_synth', ['h2', 'chlorine gas'], ['hcl'], { minTemp: 200, rate: { k: 0.5 }, dH: -184, fx: [{ fx: 'flame', color: '#e8f0a0', size: 0.4 }], name: 'Hydrogen burns in chlorine (hydrogen chloride)' });
+  I('Synthesis', 'gas_synth', ['h2', 'sulfur'], ['hydrogen sulfide'], { minTemp: 300, rate: { k: 0.02 }, dH: -20 });
+  I('Synthesis', 'gas_synth', ['carbon', 'sulfur'], ['carbon disulfide'], { minTemp: 900, rate: { k: 0.02 }, dH: 89 });
+  I('Dehydration', 'gas_synth', ['nitric acid', 'p4o10'], ['dinitrogen pentoxide', 'phosphoric acid'], { minTemp: 20, rate: { k: 0.1 }, dH: -20 });
+  // hydrogen chemistry on nickel
+  for (const [alk, ane] of [['ethylene', 'ethane'], ['propylene', 'propane'], ['1-butene', 'butane'], ['2-butene', 'butane'], ['isobutylene', 'isobutane'], ['1-pentene', 'pentane'], ['1-hexene', 'hexane'], ['cyclohexene', 'cyclohexane'], ['cyclopentene', 'cyclopentane'], ['acetylene', 'ethylene'], ['styrene', 'ethylbenzene'], ['benzene', 'cyclohexane'], ['1,3-butadiene', 'butane'], ['isoprene', 'isopentane'], ['triolein', 'tristearin'], ['oleic acid', 'stearic acid'], ['acetone', 'isopropanol'], ['acetaldehyde', 'ethanol'], ['formaldehyde', 'methanol'], ['benzaldehyde', 'benzyl alcohol'], ['cyclohexanone', 'cyclohexanol'], ['glucose', 'sorbitol'], ['xylose', 'xylitol'], ['mannose', 'mannitol']])
+    I('Hydrogenation', 'hydrogenate', [alk, 'h2'], [ane], { cat: [C(NI, 500)], minTemp: 120, dH: -125, name: `${nameOf(N(alk) || alk)} + hydrogen on nickel: ${nameOf(N(ane) || ane).toLowerCase()}` });
+  I('Catalytic synthesis', 'syngas', ['co2', 'h2'], ['methane', WATER], { cat: [C(NI, 500)], minTemp: 300, dH: -165, name: 'Sabatier reaction: carbon dioxide + hydrogen to methane (nickel)' });
+  I('Catalytic reforming', 'syngas', ['methane', WATER], ['carbon monoxide', 'h2'], { cat: [C(NI, 500)], minTemp: 750, dH: 206, name: 'Steam reforming: methane + steam to carbon monoxide and hydrogen' });
+  I('Catalytic synthesis', 'syngas', ['carbon monoxide', 'h2'], ['methanol'], { cat: [C('copper', 300), C('zinc oxide', 300)], minTemp: 220, dH: -91, name: 'Methanol from carbon monoxide and hydrogen (copper catalyst)' });
+  I('Catalytic synthesis', 'syngas', ['methanol', 'carbon monoxide'], ['acetic_acid'], { cat: [C('hydroiodic acid', 300), C('iodine', 300)], minTemp: 150, dH: -135, name: 'Acetic acid from methanol and carbon monoxide (iodide catalyst)' });
+  I('Water-gas reaction', 'syngas', ['carbon', WATER], ['carbon monoxide', 'h2'], { minTemp: 900, rate: { k: 0.01 }, dH: 131, name: 'Water gas: steam over red-hot carbon' });
+  // alkenes and their products
+  I('Catalytic hydration', 'hydrate_org', ['ethylene', WATER], ['ethanol'], { cat: [C('phosphoric acid')], minTemp: 250, dH: -45, name: 'Ethanol from ethylene and steam (phosphoric acid catalyst)' });
+  I('Catalytic hydration', 'hydrate_org', ['propylene', WATER], ['isopropanol'], { cat: [C('phosphoric acid')], minTemp: 200, dH: -50 });
+  I('Catalytic hydration', 'hydrate_org', ['isobutylene', WATER], ['tert-butanol'], { cat: [C('sulfuric acid')], minTemp: 60, dH: -50 });
+  I('Catalytic hydration', 'hydrate_org', ['1-butene', WATER], ['2-butanol'], { cat: [C('sulfuric acid')], minTemp: 80, dH: -50 });
+  I('Catalytic oxidation', 'epoxide', ['ethylene', '@o2'], ['ethylene oxide'], { cat: [C('silver', 400)], minTemp: 230, dH: -105, name: 'Ethylene oxide (silver catalyst)' });
+  I('Hydrolysis', 'epoxide', ['ethylene oxide', WATER], ['ethylene glycol'], { minTemp: 60, rate: { k: 0.02 }, dH: -95 });
+  I('Hydrolysis', 'epoxide', ['propylene oxide', WATER], ['propylene glycol'], { minTemp: 60, rate: { k: 0.02 }, dH: -90 });
+  I('Addition', 'chlorinate', ['ethylene', 'chlorine gas'], ['1,2-dichloroethane'], { rate: { k: 0.3 }, dH: -180 });
+  I('Cracking', 'chlorinate', ['1,2-dichloroethane'], ['vinyl chloride', 'hcl'], { minTemp: 500, rate: { k: 0.02 }, dH: 70, name: 'Vinyl chloride from cracking dichloroethane' });
+  I('Addition', 'chlorinate', ['ethylene', 'hcl'], ['chloroethane'], { cat: [C(ALCL3, 50)], minTemp: 20, dH: -65 });
+  I('Addition', 'chlorinate', ['acetylene', 'hcl'], ['vinyl chloride'], { cat: [C('zinc chloride', 200)], minTemp: 150, dH: -100 });
+  I('Hydration', 'hydrate_org', ['acetylene', WATER], ['acetaldehyde'], { cat: [C('sulfuric acid', 200)], minTemp: 80, dH: -140, name: 'Acetaldehyde from acetylene and water' });
+  I('Trimerisation', 'aromatic', ['acetylene'], ['benzene'], { cat: [C(FE, 200), C(NI, 200)], minTemp: 500, dH: -600, name: 'Benzene from three acetylene molecules (hot iron)' });
+  // chlorinating with heat (or light)
+  for (const [a, b] of [['methane', 'chloromethane'], ['chloromethane', 'dichloromethane'], ['dichloromethane', 'chloroform'], ['chloroform', 'carbon tetrachloride'], ['ethane', 'chloroethane'], ['toluene', 'benzyl chloride'], ['1,2-dichloroethane', '1,1,1-trichloroethane'], ['carbon tetrachloride', 'tetrachloroethylene']])
+    I('Free-radical substitution', 'chlorinate', [a, 'chlorine gas'], [b, 'hcl'], { minTemp: 300, rate: { k: 0.03 }, dH: -100, name: `${nameOf(N(a) || a)} + chlorine (heat): ${nameOf(N(b) || b).toLowerCase()}` });
+  for (const [a, b] of [['methane', 'bromomethane'], ['ethane', 'ethyl bromide']]) I('Free-radical substitution', 'chlorinate', [a, 'bromine'], [b, 'hydrobromic acid'], { minTemp: 300, rate: { k: 0.02 }, dH: -30 });
+  I('Haloform reaction', 'chlorinate', ['acetone', 'iodine', 'naoh'], ['iodoform', 'sodium acetate', 'sodium iodide', WATER], { water: true, rate: { k: 0.2 }, dH: -50, name: 'Iodoform test: yellow crystals from acetone, iodine and alkali' });
+  // benzene chemistry
+  I('Electrophilic substitution', 'aromatic', ['benzene', 'chlorine gas'], ['chlorobenzene', 'hcl'], { cat: [C(FECL3, 400), C(ALCL3, 400)], minTemp: 20, dH: -130 });
+  I('Electrophilic substitution', 'aromatic', ['benzene', 'bromine'], ['bromobenzene', 'hydrobromic acid'], { cat: [C('iron(iii) bromide', 400), C(FE, 200)], minTemp: 20, dH: -40 });
+  I('Friedel-Crafts', 'aromatic', ['benzene', 'chloromethane'], ['toluene', 'hcl'], { cat: [C(ALCL3, 400)], minTemp: 20, dH: -40 });
+  I('Friedel-Crafts', 'aromatic', ['toluene', 'chloromethane'], ['p-xylene', 'hcl'], { cat: [C(ALCL3, 400)], minTemp: 20, dH: -40 });
+  I('Friedel-Crafts', 'aromatic', ['benzene', 'ethylene'], ['ethylbenzene'], { cat: [C(ALCL3, 400)], minTemp: 80, dH: -110 });
+  I('Friedel-Crafts', 'aromatic', ['benzene', 'propylene'], ['cumene'], { cat: [C('phosphoric acid', 400), C(ALCL3, 400)], minTemp: 200, dH: -100 });
+  I('Friedel-Crafts', 'aromatic', ['benzene', 'acetyl chloride'], ['acetophenone', 'hcl'], { cat: [C(ALCL3, 400)], minTemp: 40, dH: -60 });
+  I('Friedel-Crafts', 'aromatic', ['benzene', 'benzoyl chloride'], ['benzophenone', 'hcl'], { cat: [C(ALCL3, 400)], minTemp: 60, dH: -60 });
+  I('Catalytic dehydrogenation', 'aromatic', ['ethylbenzene'], ['styrene', 'h2'], { cat: [C('fe2o3', 400)], minTemp: 600, dH: 124, name: 'Styrene from ethylbenzene (iron oxide catalyst)' });
+  I('Cumene process', 'aromatic', ['cumene', '@o2'], ['phenol', 'acetone'], { cat: [C('sulfuric acid', 300)], minTemp: 90, dH: -250, name: 'Cumene process: phenol and acetone from cumene and air' });
+  I('Catalytic oxidation', 'aromatic', ['toluene', '@o2'], ['benzoic acid', WATER], { cat: [C('cobalt', 300), C('manganese dioxide', 300)], minTemp: 150, dH: -600 });
+  I('Catalytic oxidation', 'aromatic', ['p-xylene', '@o2'], ['terephthalic acid', WATER], { cat: [C('cobalt', 300)], minTemp: 180, dH: -1300 });
+  I('Catalytic oxidation', 'aromatic', ['naphthalene', '@o2'], ['phthalic anhydride', WATER, 'co2'], { cat: [C(V2O5, 400)], minTemp: 350, dH: -1800 });
+  I('Catalytic oxidation', 'aromatic', ['benzene', '@o2'], ['maleic anhydride', WATER, 'co2'], { cat: [C(V2O5, 400)], minTemp: 400, dH: -1800 });
+  I('Hydrolysis', 'aromatic', ['phthalic anhydride', WATER], ['phthalic acid'], { minTemp: 60, rate: { k: 0.05 }, dH: -30 });
+  I('Hydrolysis', 'aromatic', ['maleic anhydride', WATER], ['maleic acid'], { minTemp: 20, rate: { k: 0.05 }, dH: -30 });
+  I('Dehydrogenation', 'aromatic', ['cyclohexane'], ['benzene', 'h2'], { cat: [C(PT, 400)], minTemp: 450, dH: 206 });
+  I('Dehydrogenation', 'aromatic', ['butane'], ['1,3-butadiene', 'h2'], { cat: [C('chromium(iii) oxide', 400)], minTemp: 600, dH: 236 });
+  I('Dehydrogenation', 'aromatic', ['ethane'], ['ethylene', 'h2'], { minTemp: 800, rate: { k: 0.01 }, dH: 137, name: 'Cracking ethane to ethylene' });
+  I('Cracking', 'aromatic', ['hexane'], ['ethylene', 'butane'], { cat: [C('al2o3', 300), C('sio2', 300)], minTemp: 500, dH: 80, name: 'Cracking hexane into smaller molecules' });
+  I('Cracking', 'aromatic', ['hexane'], ['propylene', 'propane'], { cat: [C('al2o3', 300), C('sio2', 300)], minTemp: 500, dH: 80 });
+  I('Cracking', 'aromatic', ['butane'], ['methane', 'propylene'], { minTemp: 700, rate: { k: 0.01 }, dH: 80 });
+  I('Reforming', 'aromatic', ['hexane'], ['benzene', 'h2'], { cat: [C(PT, 400)], minTemp: 500, dH: 250, name: 'Reforming hexane into benzene (platinum catalyst)' });
+  I('Reforming', 'aromatic', ['heptane'], ['toluene', 'h2'], { cat: [C(PT, 400)], minTemp: 500, dH: 250 });
+  // ammonia chemistry
+  I('Synthesis', 'ammonia_chem', ['ammonia', 'co2'], ['urea', WATER], { minTemp: 180, rate: { k: 0.01 }, dH: -100, name: 'Urea from ammonia and carbon dioxide' });
+  I('Condensation', 'ammonia_chem', ['urea'], ['melamine', 'ammonia', 'co2'], { minTemp: 390, rate: { k: 0.01 }, dH: 470 });
+  for (const [alc, am] of [['methanol', 'methylamine'], ['ethanol', 'ethylamine'], ['1-propanol', 'propylamine'], ['1-butanol', 'butylamine']]) I('Catalytic amination', 'ammonia_chem', [alc, 'ammonia'], [am, WATER], { cat: [C('al2o3', 300)], minTemp: 350, dH: -20 });
+  I('Catalytic amination', 'ammonia_chem', ['methanol', 'ammonia'], ['dimethylamine', WATER], { cat: [C('al2o3', 300)], minTemp: 380, dH: -40 });
+  I('Catalytic amination', 'ammonia_chem', ['methanol', 'ammonia'], ['trimethylamine', WATER], { cat: [C('al2o3', 300)], minTemp: 400, dH: -60 });
+  I('Ring opening', 'ammonia_chem', ['ethylene oxide', 'ammonia'], ['ethanolamine'], { minTemp: 40, rate: { k: 0.02 }, dH: -90 });
+  I('Ammoxidation', 'ammonia_chem', ['propylene', 'ammonia', '@o2'], ['acrylonitrile', WATER], { cat: [C('bismuth(iii) oxide', 400), C('molybdenum(vi) oxide', 400)], minTemp: 420, dH: -515 });
+  I('Neutralisation', 'neutral', ['ammonia', 'hcl'], ['ammonium chloride'], { rate: { k: 5 }, dH: -176, fx: [{ fx: 'smoke', amount: 0.6, color: '#f4f4f0' }], name: 'Ammonia meets hydrogen chloride: a white smoke of ammonium chloride' });
+  // polymers
+  for (const [m, pol, cat, T] of [['ethylene', 'polyethylene', 'titanium(iv) chloride', 80], ['propylene', 'polypropylene', 'titanium(iv) chloride', 80], ['vinyl chloride', 'polyvinyl chloride', 'h2o2', 60], ['tetrafluoroethylene', 'polytetrafluoroethylene', 'h2o2', 60], ['chloroprene', 'neoprene', 'h2o2', 50], ['isobutylene', 'polyisobutylene', ALCL3, -50], ['ethylene oxide', 'polyethylene oxide', 'koh', 100], ['propylene oxide', 'polypropylene glycol', 'koh', 100], ['formaldehyde', 'polyoxymethylene', 'sulfuric acid', 20], ['acrylamide', 'polyacrylamide', 'h2o2', 40], ['acrylic acid', 'polyacrylic acid', 'h2o2', 60], ['vinyl alcohol', 'polyvinyl alcohol', 'h2o2', 60]])
+    I('Polymerisation', 'polymer', [m], [pol], { cat: [C(cat, 400)], minTemp: Math.max(T, 20), dH: -90, name: `${nameOf(N(m) || m)} links into ${nameOf(N(pol) || pol).toLowerCase()}` });
+  I('Hydrolysis', 'polymer', ['polyvinyl acetate', 'naoh'], ['polyvinyl alcohol', 'sodium acetate'], { water: true, minTemp: 50, rate: { k: 0.01 }, dH: -20 });
+  I('Polymerisation', 'polymer', ['phenol', 'formaldehyde'], ['bakelite', WATER], { cat: [C('hcl', 300)], minTemp: 90, dH: -60 });
+  I('Polymerisation', 'polymer', ['melamine', 'formaldehyde'], ['melamine-formaldehyde', WATER], { minTemp: 80, rate: { k: 0.003 }, dH: -40 });
+  I('Polymerisation', 'polymer', ['sodium hydroxide', 'acrylic acid'], ['sodium polyacrylate', WATER], { cat: [C('h2o2', 300)], minTemp: 60, dH: -100 });
+  I('Polymerisation', 'polymer', ['1,3-butadiene', 'styrene'], ['styrene-butadiene rubber'], { cat: [C('h2o2', 300)], minTemp: 50, dH: -150 });
+  // inorganic helpers that open up whole families
+  I('Synthesis', 'synth', ['aluminium', 'chlorine gas'], ['aluminum chloride'], { minTemp: 200, rate: { k: 0.2 }, dH: -1400, fx: [{ fx: 'sparks', amount: 0.6 }] });
+  I('Synthesis', 'synth', ['iron', 'chlorine gas'], ['iron(iii) chloride'], { minTemp: 200, rate: { k: 0.2 }, dH: -800, fx: [{ fx: 'smoke', amount: 0.5, color: '#a8521e' }] });
+  I('Synthesis', 'synth', ['sodium', 'chlorine gas'], ['nacl'], { minTemp: 20, rate: { k: 0.5 }, dH: -822, fx: [{ fx: 'flame', color: '#ffd400', size: 0.6 }], name: 'Sodium burns in chlorine: table salt' });
+  I('Synthesis', 'synth', ['iron', 'bromine'], ['iron(iii) bromide'], { minTemp: 20, rate: { k: 0.1 }, dH: -500 });
+  I('Synthesis', 'synth', ['titanium dioxide', 'carbon', 'chlorine gas'], ['titanium(iv) chloride', 'carbon monoxide'], { minTemp: 900, rate: { k: 0.01 }, dH: 80, name: 'Titanium chloride (chloride process)' });
+  I('Thermal decomposition', 'decomp', ['ammonium metavanadate'], ['vanadium(v) oxide', 'ammonia', WATER], { minTemp: 200, rate: { k: 0.05 }, dH: 100 });
+  I('Thermal decomposition', 'decomp', ['ammonium molybdate'], ['molybdenum(vi) oxide', 'ammonia', WATER], { minTemp: 300, rate: { k: 0.05 }, dH: 100 });
+  I('Reduction', 'smelt', ['titanium(iv) chloride', 'magnesium'], ['titanium', 'mgcl2'], { minTemp: 800, rate: { k: 0.02 }, dH: -500 });
+  I('Synthesis', 'gas_synth', ['carbon monoxide', 'naoh'], ['sodium formate'], { minTemp: 150, rate: { k: 0.02 }, dH: -60 });
+  I('Peroxide', 'gas_synth', ['barium', '@o2'], ['barium peroxide'], { minTemp: 500, rate: { k: 0.02 }, dH: -630 });
+  I('Peroxide', 'gas_synth', ['sodium', '@o2'], ['sodium peroxide'], { minTemp: 300, rate: { k: 0.05 }, dH: -510, fx: [{ fx: 'flame', color: '#ffd400', size: 0.5 }] });
+  I('Peroxide', 'gas_synth', ['potassium', '@o2'], ['potassium superoxide'], { minTemp: 200, rate: { k: 0.05 }, dH: -285, fx: [{ fx: 'flame', color: '#c88ae0', size: 0.5 }] });
+  I('Hydride', 'gas_synth', ['lithium', 'h2'], ['lithium hydride'], { minTemp: 600, rate: { k: 0.02 }, dH: -180 });
+  I('Hydride', 'gas_synth', ['sodium', 'h2'], ['sodium hydride'], { minTemp: 300, rate: { k: 0.02 }, dH: -112 });
+  I('Hydride', 'gas_synth', ['calcium', 'h2'], ['calcium hydride'], { minTemp: 400, rate: { k: 0.02 }, dH: -186 });
+  I('Synthesis', 'gas_synth', ['silicon', 'carbon'], ['silicon carbide'], { minTemp: 1600, rate: { k: 0.01 }, dH: -73, name: 'Carborundum: silicon and carbon in great heat' });
+  I('Synthesis', 'gas_synth', ['aluminium', '@n2'], ['aluminum nitride'], { minTemp: 1000, rate: { k: 0.01 }, dH: -318 });
+  I('Synthesis', 'gas_synth', ['iron', 'carbon'], ['iron carbide'], { minTemp: 1100, rate: { k: 0.01 }, dH: 25, name: 'Cementite: iron dissolving carbon (the hard part of steel)' });
+  I('Synthesis', 'gas_synth', ['silicon', '@n2'], ['silicon nitride'], { minTemp: 1300, rate: { k: 0.01 }, dH: -744 });
+  I('Synthesis', 'gas_synth', ['zinc', 'sulfur'], ['zinc sulfide'], { minTemp: 300, rate: { k: 0.3 }, dH: -206, fx: [{ fx: 'flame', color: '#7ad0ff', size: 0.6 }] });
+}
+// ---------- the big push: real routes for as many of the rest as possible ----------
+{
+  const N = (...n) => named(...n);
+  const res = (x) => (x === '@o2' ? O2 : x === '@n2' ? N('nitrogen gas', 'nitrogen') : pool.has(x) ? x : N(x));
+  function J(kind, fam, ins, outs, o = {}) {
+    const a = ins.map(res), b = outs.map(res);
+    if (![...a, ...b].every(has) || b.some((id) => pool.get(id).banned)) return;
+    const bal = balance(a, b); if (!bal) return;
+    const airIds = new Set(ins.map((x, k) => (x.startsWith('@') ? a[k] : null)).filter(Boolean));
+    const cat = (o.cat || []).map((c) => ({ id: res(c), boost: o.boost || 300 })).filter((c) => has(c.id));
+    if (o.cat && o.cat.length && !cat.length) return;
+    const sig = bal.ins.map((x) => x.mol + x.id).sort().join('+') + '>' + bal.outs.map((x) => x.mol + x.id).sort().join('+');
+    if (seen.has(sig)) return; seen.add(sig);
+    const r = { id: 'g_' + fam + '_' + RXS.length, name: o.name || `${nameOf(b[0])} from ${a.filter((x) => !airIds.has(x)).map((x) => nameOf(x).toLowerCase()).join(' and ')}`, kind, inputs: bal.ins.map((x) => (airIds.has(x.id) ? { ...x, from: 'air' } : x)), outputs: bal.outs, enthalpy_kJ: o.dH ?? -60, rate: o.rate || { k: cat.length ? 0.0006 : 0.03 }, effects: o.fx || [], discovery: 'rx_gen_' + fam, gen: true };
+    if (cat.length) r.catalysts = cat;
+    if (o.T !== undefined || o.maxT !== undefined) r.conditions = { ...(o.T ? { minTemp: o.T } : {}), ...(o.maxT !== undefined ? { maxTemp: o.maxT } : {}) };
+    if (o.water) r.requires = [{ id: WATER }];
+    RXS.push(r); for (const x of bal.outs) madeBy.set(x.id, (madeBy.get(x.id) || 0) + 1);
+  }
+  // --- alkanes from paraffin wax by cracking, then everything downstream
+  const ALK = ['methane', 'ethane', 'propane', 'butane', 'pentane', 'hexane', 'heptane', 'octane', 'nonane', 'decane', 'undecane', 'dodecane', null, null, null, 'hexadecane', null, null, null, 'eicosane'];
+  for (let n = 4; n <= 30; n++) {
+    const big = n === 30 ? 'triacontane' : ALK[n - 1];
+    if (!big) continue;
+    for (const [alkene, k] of [['ethylene', 2], ['propylene', 3]]) for (let m = 1; m <= 3; m++) { const small = ALK[n - k * m - 1]; if (small && n - k * m >= 1) J('Cracking', 'aromatic', [big], [small, alkene], { cat: ['al2o3', 'sio2'], T: 450, dH: 90, name: `Cracking ${big}: ${small} and ${alkene}` }); }
+  }
+  for (const [ane, ene] of [['pentane', '1-pentene'], ['hexane', '1-hexene'], ['butane', '1-butene'], ['butane', '2-butene'], ['propane', 'propylene'], ['isobutane', 'isobutylene'], ['isopentane', 'isoprene'], ['cyclohexane', 'cyclohexene'], ['cyclopentane', 'cyclopentene']]) J('Catalytic dehydrogenation', 'aromatic', [ane], [ene, 'h2'], { cat: ['platinum', 'chromium(iii) oxide'], T: 550, dH: 125 });
+  J('Isomerisation', 'aromatic', ['butane'], ['isobutane'], { cat: ['aluminum chloride'], T: 100, dH: -8 });
+  J('Isomerisation', 'aromatic', ['pentane'], ['isopentane'], { cat: ['aluminum chloride'], T: 100, dH: -8 });
+  J('Alkylation', 'aromatic', ['isobutane', 'isobutylene'], ['isooctane (2,2,4-trimethylpentane)', 'isooctane'], { cat: ['sulfuric acid'], T: 20, dH: -80, name: 'Isooctane (petrol) from isobutane and isobutylene' });
+  for (const [ane, aro] of [['octane', 'o-xylene'], ['octane', 'm-xylene'], ['octane', 'p-xylene'], ['octane', 'ethylbenzene'], ['heptane', 'toluene'], ['nonane', 'mesitylene'], ['nonane', 'cumene']]) J('Reforming', 'aromatic', [ane], [aro, 'h2'], { cat: ['platinum'], T: 500, dH: 250 });
+  for (const [aro, sat] of [['toluene', 'methylcyclohexane'], ['naphthalene', 'tetralin'], ['naphthalene', 'decalin'], ['biphenyl', 'cyclohexylbenzene']]) J('Hydrogenation', 'hydrogenate', [aro, 'h2'], [sat], { cat: ['nickel'], T: 150, dH: -200 });
+  J('Coupling', 'aromatic', ['benzene', '@o2'], ['biphenyl', WATER], { cat: ['platinum'], T: 700, dH: -100 });
+  J('Friedel-Crafts', 'aromatic', ['benzene', 'benzyl chloride'], ['diphenylmethane', 'hcl'], { cat: ['aluminum chloride'], T: 40 });
+  J('Friedel-Crafts', 'aromatic', ['toluene', 'propylene'], ['cymene (p-cymene)', 'cymene'], { cat: ['aluminum chloride'], T: 40 });
+  J('Friedel-Crafts', 'aromatic', ['benzene', 'chloromethane'], ['hexamethylbenzene', 'hcl'], { cat: ['aluminum chloride'], T: 100 });
+  J('Friedel-Crafts', 'aromatic', ['benzene', 'chloromethane'], ['durene', 'hcl'], { cat: ['aluminum chloride'], T: 80 });
+  J('Friedel-Crafts', 'aromatic', ['benzene', 'chloroform'], ['triphenylmethane', 'hcl'], { cat: ['aluminum chloride'], T: 60 });
+  J('Dehydrogenation', 'aromatic', ['ethylbenzene'], ['stilbene', 'h2'], { cat: ['platinum'], T: 600 });
+  // --- alcohols, glycols, ethers
+  for (const [ene, alc] of [['ethylene', '1-propanol'], ['propylene', '1-butanol'], ['propylene', 'isobutanol'], ['1-butene', '1-pentanol'], ['1-pentene', '1-hexanol']]) J('Oxo process', 'syngas', [ene, 'carbon monoxide', 'h2'], [alc], { cat: ['cobalt'], T: 150, dH: -200, name: `${nameOf(N(alc))} from ${ene}, carbon monoxide and hydrogen (oxo process)` });
+  for (const [fat, acid] of [['triolein', 'oleic acid'], ['tristearin', 'stearic acid'], ['tripalmitin', 'palmitic acid'], ['oil', 'oleic acid'], ['triacetin', 'acetic_acid']]) J('Hydrolysis', 'ester_split', [fat, WATER], ['glycerol', acid], { cat: ['sulfuric acid'], T: 100, dH: -10, name: `Splitting ${nameOf(res(fat)).toLowerCase()} into glycerol and ${nameOf(res(acid)).toLowerCase()}` });
+  for (const [acid, alc] of [['caprylic acid', '1-octanol'], ['palmitic acid', 'cetyl alcohol'], ['stearic acid', 'stearyl alcohol'], ['caproic acid', '1-hexanol'], ['valeric acid', '1-pentanol']]) J('Hydrogenation', 'hydrogenate', [acid, 'h2'], [alc, WATER], { cat: ['copper', 'nickel'], T: 250, dH: -60 });
+  J('Hydrolysis', 'epoxide', ['ethylene oxide', 'ethylene glycol'], ['diethylene glycol'], { T: 80, dH: -90 });
+  J('Hydrolysis', 'epoxide', ['ethylene oxide', 'diethylene glycol'], ['polyethylene glycol (peg)', 'polyethylene glycol'], { T: 100, dH: -90 });
+  J('Catalytic oxidation', 'epoxide', ['propylene', 'h2o2'], ['propylene oxide', WATER], { cat: ['titanium dioxide'], T: 40, dH: -200, name: 'Propylene oxide from propylene and hydrogen peroxide' });
+  J('Hydrogenation', 'hydrogenate', ['maleic anhydride', 'h2'], ['butanediol (1,4-)', WATER], { cat: ['copper', 'nickel'], T: 200, dH: -200 });
+  J('Dehydration', 'ether', ['butanediol (1,4-)'], ['tetrahydrofuran (thf)', WATER], { cat: ['phosphoric acid'], T: 200 });
+  J('Dehydrogenation', 'ether', ['butanediol (1,4-)'], ['gamma-butyrolactone', 'h2'], { cat: ['copper'], T: 220 });
+  J('Dehydration', 'ether', ['diethylene glycol'], ['1,4-dioxane', WATER], { cat: ['sulfuric acid'], T: 160 });
+  J('Condensation', 'ether', ['ethylene glycol', 'formaldehyde'], ['1,3-dioxolane', WATER], { cat: ['sulfuric acid'], T: 80 });
+  J('Condensation', 'ether', ['isobutylene', 'methanol'], ['methyl tert-butyl ether (mtbe)', 'methyl tert-butyl ether'], { cat: ['sulfuric acid'], T: 60 });
+  J('Condensation', 'ether', ['isopropanol'], ['diisopropyl ether', WATER], { cat: ['sulfuric acid'], T: 140 });
+  J('Condensation', 'ether', ['phenol', 'methanol'], ['anisole', WATER], { cat: ['al2o3'], T: 300 });
+  J('Ullmann coupling', 'ether', ['chlorobenzene', 'phenol'], ['diphenyl ether', 'hcl'], { cat: ['copper'], T: 200 });
+  J('Condensation', 'ether', ['formaldehyde'], ['trioxane'], { cat: ['sulfuric acid'], T: 20 });
+  J('Condensation', 'ether', ['acetaldehyde'], ['paraldehyde'], { cat: ['sulfuric acid'], T: 20 });
+  J('Condensation', 'ether', ['ethanol', 'chloroethane'], ['diethyl ether', 'hcl'], { T: 60 });
+  J('Hydrogenation', 'hydrogenate', ['acrolein', 'h2'], ['allyl alcohol'], { cat: ['nickel'], T: 100 });
+  J('Hydrogenation', 'hydrogenate', ['salicylaldehyde', 'h2'], ['salicyl alcohol'], { cat: ['nickel'], T: 80 });
+  J('Hydrogenation', 'hydrogenate', ['menthone', 'h2'], ['menthol'], { cat: ['nickel'], T: 100 });
+  J('Hydrogenation', 'hydrogenate', ['camphor', 'h2'], ['borneol'], { cat: ['nickel'], T: 100 });
+  J('Hydrogenation', 'hydrogenate', ['furfural', 'h2'], ['furfuryl alcohol'], { cat: ['copper'], T: 120 });
+  J('Decarbonylation', 'aromatic', ['furfural'], ['furan', 'carbon monoxide'], { cat: ['nickel'], T: 300 });
+  J('Dehydration', 'sugar_split', ['xylose'], ['furfural', WATER], { cat: ['sulfuric acid'], T: 150, name: 'Furfural from xylose (oat husks chemistry)' });
+  J('Friedel-Crafts', 'aromatic', ['benzene', 'ethylene oxide'], ['2-phenylethanol'], { cat: ['aluminum chloride'], T: 20 });
+  J('Condensation', 'aromatic', ['phenol', 'acetone'], ['bisphenol a', WATER], { cat: ['hcl'], T: 60, name: 'Bisphenol A from phenol and acetone' });
+  J('Hydroxylation', 'aromatic', ['phenol', 'h2o2'], ['catechol', WATER], { cat: ['iron(iii) chloride'], T: 60 });
+  J('Hydroxylation', 'aromatic', ['phenol', 'h2o2'], ['hydroquinone', WATER], { cat: ['iron(iii) chloride'], T: 60 });
+  J('Hydroxylation', 'aromatic', ['phenol', 'h2o2'], ['resorcinol', WATER], { cat: ['titanium dioxide'], T: 80 });
+  J('Hydroxylation', 'aromatic', ['catechol', 'h2o2'], ['pyrogallol', WATER], { cat: ['iron(iii) chloride'], T: 60 });
+  J('Hydroxylation', 'aromatic', ['resorcinol', 'h2o2'], ['phloroglucinol', WATER], { cat: ['iron(iii) chloride'], T: 60 });
+  J('Methylation', 'aromatic', ['phenol', 'methanol'], ['cresol (o-, m-, p-)', 'cresol', WATER], { cat: ['al2o3'], T: 300 });
+  J('Methylation', 'aromatic', ['cresol', 'propylene'], ['thymol'], { cat: ['al2o3'], T: 300 });
+  J('Methylation', 'aromatic', ['cresol', 'propylene'], ['carvacrol'], { cat: ['al2o3'], T: 350 });
+  J('Condensation', 'org_oxidise', ['acetaldehyde', 'formaldehyde', 'naoh'], ['pentaerythritol', 'sodium formate'], { water: true, T: 40, name: 'Pentaerythritol from acetaldehyde and formaldehyde' });
+  J('Condensation', 'org_oxidise', ['butanal', 'formaldehyde', 'naoh'], ['trimethylolpropane', 'sodium formate'], { water: true, T: 40 });
+  J('Hydration', 'hydrate_org', ['propylene oxide', WATER], ['propylene glycol'], { T: 60, rate: { k: 0.02 } });
+  // --- aldehydes, ketones, acids
+  for (const [a, b] of [['1-pentanol', '2-pentanone'], ['2-butanol', 'butanone (mek)'], ['isobutanol', 'methyl isobutyl ketone'], ['cyclopentanol', 'cyclopentanone']]) void a, void b;
+  J('Oxidation', 'org_oxidise', ['cyclohexane', '@o2'], ['cyclohexanone', WATER], { cat: ['cobalt'], T: 150, dH: -300 });
+  J('Oxidation', 'org_oxidise', ['cyclohexanone', 'nitric acid'], ['adipic acid', 'nitrogen dioxide', WATER], { T: 60, dH: -300, name: 'Adipic acid from cyclohexanone and nitric acid (for nylon)' });
+  J('Ketonisation', 'org_oxidise', ['adipic acid'], ['cyclopentanone', 'co2', WATER], { cat: ['barium hydroxide'], T: 300 });
+  J('Condensation', 'org_oxidise', ['acetone'], ['methyl isobutyl ketone', WATER], { cat: ['nickel'], T: 150 });
+  J('Condensation', 'org_oxidise', ['acetone', 'acetic anhydride'], ['acetylacetone', WATER], { cat: ['sulfuric acid'], T: 60 });
+  J('Condensation', 'org_oxidise', ['acetone', 'formaldehyde'], ['methyl vinyl ketone', WATER], { cat: ['naoh'], T: 60 });
+  J('Condensation', 'org_oxidise', ['benzaldehyde', 'acetaldehyde'], ['cinnamaldehyde', WATER], { cat: ['naoh'], T: 20, name: 'Cinnamaldehyde (cinnamon smell)' });
+  J('Perkin reaction', 'org_oxidise', ['benzaldehyde', 'acetic anhydride'], ['cinnamic acid', 'acetic_acid'], { cat: ['sodium acetate'], T: 170 });
+  J('Oxidation', 'org_oxidise', ['benzene', '@o2'], ['benzoquinone', WATER], { cat: ['vanadium(v) oxide'], T: 400 });
+  J('Oxidation', 'org_oxidise', ['naphthalene', '@o2'], ['naphthoquinone', WATER], { cat: ['vanadium(v) oxide'], T: 300 });
+  J('Oxidation', 'org_oxidise', ['anthracene', '@o2'], ['anthraquinone', WATER], { cat: ['vanadium(v) oxide'], T: 300 });
+  J('Oxidation', 'org_oxidise', ['ethylbenzene', '@o2'], ['acetophenone', WATER], { cat: ['cobalt'], T: 150 });
+  J('Oxidation', 'org_oxidise', ['diphenylmethane', '@o2'], ['benzophenone', WATER], { cat: ['cobalt'], T: 150 });
+  J('Oxidation', 'org_oxidise', ['ethanol', '@o2'], ['diacetyl', WATER], { cat: ['copper'], T: 300 });
+  J('Oxidation', 'org_oxidise', ['propylene', '@o2'], ['acrolein', WATER], { cat: ['bismuth(iii) oxide'], T: 350 });
+  J('Oxidation', 'org_oxidise', ['acrolein', '@o2'], ['acrylic acid'], { cat: ['molybdenum(vi) oxide'], T: 280 });
+  J('Oxidation', 'org_oxidise', ['m-xylene', '@o2'], ['isophthalic acid', WATER], { cat: ['cobalt'], T: 180 });
+  J('Oxidation', 'org_oxidise', ['o-xylene', '@o2'], ['phthalic anhydride', WATER], { cat: ['vanadium(v) oxide'], T: 350 });
+  J('Oxidation', 'org_oxidise', ['lactic acid', '@o2'], ['pyruvic acid', WATER], { cat: ['platinum'], T: 80 });
+  J('Oxidation', 'org_oxidise', ['glucose', 'bromine', WATER], ['gluconic acid', 'hydrobromic acid'], { T: 20, rate: { k: 0.05 } });
+  J('Oxidation', 'org_oxidise', ['ethylene glycol', '@o2'], ['glyoxal', WATER], { cat: ['silver'], T: 300 });
+  J('Oxidation', 'org_oxidise', ['glyoxal', '@o2'], ['glycolic acid'], { cat: ['platinum'], T: 60 });
+  J('Hydration', 'hydrate_org', ['maleic acid', WATER], ['malic acid'], { T: 180, rate: { k: 0.01 } });
+  J('Isomerisation', 'hydrate_org', ['maleic acid'], ['fumaric acid'], { cat: ['hcl'], T: 60 });
+  J('Hydrogenation', 'hydrogenate', ['maleic acid', 'h2'], ['succinic acid'], { cat: ['nickel'], T: 100 });
+  J('Dehydration', 'org_oxidise', ['succinic acid'], ['succinic anhydride', WATER], { T: 200, rate: { k: 0.02 } });
+  J('Chlorination', 'chlorinate', ['acetic_acid', 'chlorine gas'], ['chloroacetic acid', 'hcl'], { cat: ['acetic anhydride'], T: 100 });
+  J('Chlorination', 'chlorinate', ['chloroacetic acid', 'chlorine gas'], ['trichloroacetic acid', 'hcl'], { cat: ['acetic anhydride'], T: 140 });
+  J('Hydrolysis', 'chlorinate', ['chloroacetic acid', WATER], ['glycolic acid', 'hcl'], { T: 100 });
+  J('Hydrolysis', 'chlorinate', ['benzal chloride', WATER], ['benzaldehyde', 'hcl'], { T: 100 });
+  J('Oxidation', 'org_oxidise', ['toluene', '@o2'], ['benzaldehyde', WATER], { cat: ['manganese dioxide'], T: 100 });
+  // --- acyl chlorides, anhydrides and the things they make
+  for (const [acid, cl] of [['acetic_acid', 'acetyl chloride'], ['benzoic acid', 'benzoyl chloride'], ['chloroacetic acid', 'chloroacetyl chloride'], ['terephthalic acid', 'terephthaloyl chloride'], ['adipic acid', 'adipoyl chloride'], ['sebacic acid', 'sebacoyl chloride'], ['oxalic acid', 'oxalyl chloride']]) J('Acyl chloride', 'acyl', [acid, 'phosphorus trichloride'], [cl, 'phosphorous acid'], { T: 50, dH: -30, name: `${nameOf(N(cl))} from ${nameOf(res(acid)).toLowerCase()} and phosphorus trichloride` });
+  for (const [anh, alc, ester] of [['phthalic anhydride', 'methanol', 'dimethyl phthalate'], ['phthalic anhydride', 'ethanol', 'diethyl phthalate'], ['phthalic anhydride', '1-butanol', 'dibutyl phthalate']]) J('Esterification', 'ester', [anh, alc], [ester, WATER], { cat: ['sulfuric acid'], T: 120 });
+  J('Condensation', 'aromatic', ['phthalic anhydride', 'phenol'], ['phph', WATER], { cat: ['sulfuric acid'], T: 120, name: 'Phenolphthalein from phthalic anhydride and phenol' });
+  J('Condensation', 'aromatic', ['phthalic anhydride', 'resorcinol'], ['fluorescein', WATER], { cat: ['zinc chloride'], T: 180, name: 'Fluorescein from phthalic anhydride and resorcinol (it glows green)' });
+  J('Condensation', 'aromatic', ['phenol', 'formaldehyde'], ['bakelite (phenol-formaldehyde, typical)', 'bakelite', WATER], { cat: ['hcl'], T: 90 });
+  for (const [acid, alc, ester] of [['malonic acid', 'ethanol', 'diethyl malonate'], ['acrylic acid', 'ethanol', 'ethyl acrylate'], ['methacrylic acid', 'methanol', 'methyl methacrylate'], ['palmitic acid', 'glycerol', 'tripalmitin'], ['oleic acid', 'glycerol', 'triolein'], ['phosphoric acid', 'methanol', 'trimethyl phosphate'], ['phosphoric acid', 'ethanol', 'triethyl phosphate'], ['phosphoric acid', '1-butanol', 'tributyl phosphate'], ['phosphoric acid', 'phenol', 'triphenyl phosphate'], ['boric acid', 'methanol', 'trimethyl borate']]) J('Esterification', 'ester', [acid, alc], [ester, WATER], { cat: ['sulfuric acid'], T: 80 });
+  J('Carbonylation', 'ester', ['methanol', 'carbon monoxide', '@o2'], ['dimethyl carbonate', WATER], { cat: ['copper(i) chloride', 'copper'], T: 120 });
+  J('Carbonylation', 'ester', ['ethanol', 'carbon monoxide', '@o2'], ['diethyl carbonate', WATER], { cat: ['copper(i) chloride', 'copper'], T: 120 });
+  J('Addition', 'ester', ['ethylene oxide', 'co2'], ['ethylene carbonate'], { cat: ['potassium iodide'], T: 150 });
+  J('Addition', 'ester', ['propylene oxide', 'co2'], ['propylene carbonate'], { cat: ['potassium iodide'], T: 150 });
+  J('Condensation', 'ester', ['ethyl acetate'], ['ethyl acetoacetate', 'ethanol'], { cat: ['sodium ethoxide'], T: 80, name: 'Claisen condensation: ethyl acetoacetate' });
+  J('Condensation', 'ester', ['gamma-butyrolactone', 'methylamine'], ['n-methylpyrrolidone (nmp)', 'n-methylpyrrolidone', WATER], { T: 250 });
+  J('Hydrogenation', 'hydrogenate', ['levulinic acid', 'h2'], ['gamma-valerolactone', WATER], { cat: ['nickel'], T: 150 });
+  J('Esterification', 'ester', ['1-octanol', 'acetic_acid'], ['octyl acetate', WATER], { cat: ['sulfuric acid'], T: 80 });
+  J('Esterification', 'ester', ['glycerol', 'acetic anhydride'], ['triacetin', 'acetic_acid'], { T: 100 });
+  // --- amines and nitrogen compounds
+  for (const [alc, am] of [['ethanol', 'diethylamine'], ['ethanol', 'triethylamine']]) J('Catalytic amination', 'ammonia_chem', [alc, 'ammonia'], [am, WATER], { cat: ['al2o3'], T: 380 });
+  J('Amination', 'ammonia_chem', ['1,2-dichloroethane', 'ammonia'], ['ethylenediamine', 'hcl'], { T: 150 });
+  J('Ring opening', 'ammonia_chem', ['ethylene oxide', 'ammonia'], ['diethanolamine'], { T: 40 });
+  J('Ring opening', 'ammonia_chem', ['ethylene oxide', 'ammonia'], ['triethanolamine'], { T: 50 });
+  J('Dehydration', 'ammonia_chem', ['diethanolamine'], ['morpholine', WATER], { cat: ['sulfuric acid'], T: 180 });
+  J('Amination', 'ammonia_chem', ['tetrahydrofuran (thf)', 'ammonia'], ['pyrrolidine', WATER], { cat: ['al2o3'], T: 300 });
+  J('Amination', 'ammonia_chem', ['phenol', 'ammonia'], ['aniline', WATER], { cat: ['al2o3'], T: 400, name: 'Aniline from phenol and ammonia' });
+  J('Methylation', 'ammonia_chem', ['aniline', 'methanol'], ['n,n-dimethylaniline', WATER], { cat: ['sulfuric acid'], T: 200 });
+  J('Acylation', 'ammonia_chem', ['aniline', 'acetic anhydride'], ['acetanilide', 'acetic_acid'], { T: 60 });
+  J('Hydrogenation', 'hydrogenate', ['pyridine', 'h2'], ['piperidine'], { cat: ['nickel'], T: 150 });
+  J('Condensation', 'ammonia_chem', ['acetaldehyde', 'formaldehyde', 'ammonia'], ['pyridine', WATER, 'h2'], { cat: ['al2o3'], T: 400 });
+  J('Carbonylation', 'ammonia_chem', ['dimethylamine', 'carbon monoxide'], ['dimethylformamide (dmf)', 'dimethylformamide'], { cat: ['sodium methoxide'], T: 100 });
+  J('Condensation', 'ammonia_chem', ['dimethylamine', 'acetic_acid'], ['dimethylacetamide (dmac)', 'dimethylacetamide', WATER], { T: 200 });
+  for (const [amide, nitrile] of [['acetamide', 'acetonitrile'], ['propionamide', 'propionitrile'], ['benzamide', 'benzonitrile']]) J('Dehydration', 'ammonia_chem', [amide, 'p4o10'], [nitrile, 'phosphoric acid'], { T: 150 });
+  J('Hydration', 'ammonia_chem', ['acrylonitrile', WATER], ['acrylamide'], { cat: ['copper'], T: 80 });
+  J('Amination', 'ammonia_chem', ['sodium', 'ammonia'], ['sodium amide', 'h2'], { cat: ['iron(iii) chloride'], T: 20 });
+  J('Quaternisation', 'ammonia_chem', ['trimethylamine', 'ethylene oxide', 'hcl'], ['choline chloride'], { T: 40 });
+  J('Ammonolysis', 'ammonia_chem', ['urea'], ['biuret', 'ammonia'], { T: 160 });
+  J('Oxidation', 'aromatic', ['aniline', 'h2o2'], ['polyaniline', WATER], { cat: ['hcl'], T: 5 });
+  J('Addition', 'ammonia_chem', ['potassium thiocyanate', 'ammonium chloride'], ['thiourea', 'potassium chloride'], { T: 150 });
+  // --- halogen and sulfur organics, silicones
+  J('Chlorination', 'chlorinate', ['tetrachloroethylene', 'chlorine gas'], ['hexachloroethane'], { T: 100 });
+  J('Dehydrochlorination', 'chlorinate', ['1,1,1-trichloroethane'], ['vinylidene chloride', 'hcl'], { T: 400 });
+  J('Chlorination', 'chlorinate', ['1,2-dichloroethane', 'chlorine gas'], ['trichloroethylene', 'hcl'], { T: 400 });
+  J('Chlorination', 'chlorinate', ['chlorobenzene', 'chlorine gas'], ['dichlorobenzene (1,2-)', 'hcl'], { cat: ['iron(iii) chloride'], T: 40 });
+  J('Haloform reaction', 'chlorinate', ['acetone', 'bromine', 'naoh'], ['bromoform', 'sodium acetate', 'sodium bromide', WATER], { water: true, T: 20 });
+  J('Thiol', 'sulfur_org', ['methanol', 'hydrogen sulfide'], ['methanethiol', WATER], { cat: ['al2o3'], T: 350 });
+  J('Thiol', 'sulfur_org', ['ethanol', 'hydrogen sulfide'], ['ethanethiol', WATER], { cat: ['al2o3'], T: 350 });
+  J('Thiol', 'sulfur_org', ['methanol', 'hydrogen sulfide'], ['dimethyl sulfide', WATER], { cat: ['al2o3'], T: 400 });
+  J('Oxidation', 'sulfur_org', ['methanethiol', '@o2'], ['dimethyl disulfide', WATER], { T: 40, rate: { k: 0.02 } });
+  J('Oxidation', 'sulfur_org', ['dimethyl sulfide', '@o2'], ['dimethyl sulfoxide (dmso)', 'dimethyl sulfoxide'], { cat: ['nitrogen dioxide'], T: 60 });
+  J('Ring opening', 'sulfur_org', ['ethylene oxide', 'hydrogen sulfide'], ['mercaptoethanol'], { T: 40 });
+  J('Sulfonation', 'sulfur_org', ['benzene', 'sulfur trioxide'], ['benzenesulfonic acid'], { T: 40 });
+  J('Sulfonation', 'sulfur_org', ['toluene', 'sulfur trioxide'], ['p-toluenesulfonic acid'], { T: 40 });
+  J('Sulfonation', 'sulfur_org', ['methane', 'sulfur trioxide'], ['methanesulfonic acid'], { cat: ['sulfuric acid'], T: 50 });
+  J('Sulfonation', 'sulfur_org', ['ammonia', 'sulfur trioxide'], ['sulfamic acid'], { T: 20 });
+  J('Direct process', 'silicone', ['silicon', 'chloromethane'], ['dichlorodimethylsilane'], { cat: ['copper'], T: 300, name: 'Rochow process: dichlorodimethylsilane from silicon and chloromethane' });
+  J('Direct process', 'silicone', ['silicon', 'chloromethane'], ['methyltrichlorosilane', 'ethane'], { cat: ['copper'], T: 320 });
+  J('Direct process', 'silicone', ['silicon', 'chloromethane', 'h2'], ['trimethylsilyl chloride', 'hcl'], { cat: ['copper'], T: 320 });
+  J('Hydrolysis', 'silicone', ['dichlorodimethylsilane', WATER], ['polydimethylsiloxane (silicone)', 'hcl'], { T: 20, rate: { k: 0.2 }, name: 'Silicone from dichlorodimethylsilane and water' });
+  J('Hydrolysis', 'silicone', ['dichlorodimethylsilane', WATER], ['polydimethylsiloxane', 'hcl'], { T: 20, rate: { k: 0.2 } });
+  J('Hydrolysis', 'silicone', ['trimethylsilyl chloride', WATER], ['hexamethyldisiloxane', 'hcl'], { T: 20, rate: { k: 0.2 } });
+  J('Synthesis', 'silicone', ['silicon', 'hcl'], ['trichlorosilane', 'h2'], { T: 300 });
+  J('Synthesis', 'silicone', ['silicon', 'chlorine gas'], ['silicon tetrachloride'], { T: 400 });
+  J('Synthesis', 'silicone', ['silicon tetrachloride', 'chloromethane', 'sodium'], ['tetramethylsilane', 'nacl'], { T: 100 });
+  J('Wurtz-Fittig', 'silicone', ['phosphorus trichloride', 'chlorobenzene', 'sodium'], ['triphenylphosphine', 'nacl'], { T: 60, name: 'Triphenylphosphine from phosphorus trichloride, chlorobenzene and sodium' });
+  J('Oxidation', 'silicone', ['triphenylphosphine', 'h2o2'], ['triphenylphosphine oxide', WATER], { T: 20, rate: { k: 0.2 } });
+  // --- polymers
+  J('Polymerisation', 'polymer', ['ethylene', 'vinyl acetate'], ['ethylene-vinyl acetate'], { cat: ['h2o2'], T: 150 });
+  J('Polymerisation', 'polymer', ['polyvinyl alcohol', 'butanal'], ['polyvinyl butyral', WATER], { cat: ['hcl'], T: 60 });
+  J('Polymerisation', 'polymer', ['wood', 'acetic anhydride'], ['cellulose acetate', 'acetic_acid'], { cat: ['sulfuric acid'], T: 50, name: 'Cellulose acetate from wood fibre and acetic anhydride' });
+  J('Polymerisation', 'polymer', ['caprolactone'], ['polycaprolactone'], { cat: ['tin(ii) chloride'], T: 130 });
+  J('Polymerisation', 'polymer', ['bisphenol a', 'dimethyl carbonate'], ['polycarbonate', 'methanol'], { cat: ['sodium methoxide'], T: 250 });
+  J('Polymerisation', 'polymer', ['ethylene glycol', 'methacrylic acid'], ['ethylene glycol dimethacrylate', WATER], { cat: ['sulfuric acid'], T: 90 });
+  J('Dehydrogenation', 'aromatic', ['diethylbenzene'], ['divinylbenzene', 'h2'], { cat: ['fe2o3'], T: 600 });
+  J('Friedel-Crafts', 'aromatic', ['ethylbenzene', 'ethylene'], ['diethylbenzene'], { cat: ['aluminum chloride'], T: 80 });
+  J('Polymerisation', 'polymer', ['acrylonitrile', '1,3-butadiene', 'styrene'], ['acrylonitrile butadiene styrene (abs)', 'acrylonitrile butadiene styrene'], { cat: ['h2o2'], T: 60 });
+  J('Polymerisation', 'polymer', ['vinylidene chloride'], ['polyvinylidene chloride'], { cat: ['h2o2'], T: 60 });
+  J('Polymerisation', 'polymer', ['terephthaloyl chloride', 'p-phenylenediamine'], ['kevlar (poly-paraphenylene terephthalamide)', 'kevlar', 'hcl'], { T: 20 });
+  J('Polymerisation', 'polymer', ['adipoyl chloride', 'hexamethylenediamine'], ['nylon 6,6', 'hcl'], { T: 20, name: 'The nylon rope trick: adipoyl chloride and hexamethylenediamine' });
+  J('Polymerisation', 'polymer', ['sebacoyl chloride', 'hexamethylenediamine'], ['nylon 6,10', 'hcl'], { T: 20 });
+  // --- inorganic: gases with alkalis, oxides, salts
+  for (const p of saltList) {
+    const { cat: ca, an, w } = p.ions;
+    if (w || an.f !== 'OH' || solubility(p.ions) < 0.1) continue;
+    const carb = salt(ca, anion('CO3')), bic = salt(ca, anion('HCO3')), sulfite = salt(ca, anion('SO3')), bisul = salt(ca, anion('HSO3')), sulf = salt(ca, anion('S')), hypo = salt(ca, anion('ClO')), cl = salt(ca, anion('Cl'));
+    if (carb) J('Gas + alkali', 'gas_alkali', [p.id, 'co2'], [carb, WATER], { T: 0, rate: { k: 0.5 }, dH: -100, name: `${nameOf(p.id)} soaks up carbon dioxide: ${nameOf(carb).toLowerCase()}` });
+    if (carb && bic) J('Gas + alkali', 'gas_alkali', [carb, 'co2', WATER], [bic], { T: 0, rate: { k: 0.05 }, dH: -40 });
+    if (sulfite) J('Gas + alkali', 'gas_alkali', [p.id, 'so2'], [sulfite, WATER], { T: 0, rate: { k: 0.5 }, dH: -100 });
+    if (sulf) J('Gas + alkali', 'gas_alkali', [p.id, 'hydrogen sulfide'], [sulf, WATER], { T: 0, rate: { k: 0.5 }, dH: -60 });
+    if (hypo && cl) J('Gas + alkali', 'gas_alkali', [p.id, 'chlorine gas'], [hypo, cl, WATER], { T: 0, maxT: 40, rate: { k: 0.5 }, dH: -100, name: `${nameOf(hypo)} (bleach) from chlorine and ${nameOf(p.id).toLowerCase()}` });
+  }
+  J('Gas + alkali', 'gas_alkali', ['naoh', 'hydrogen sulfide'], ['sodium hydrosulfide', WATER], { T: 0, rate: { k: 0.5 } });
+  J('Gas + alkali', 'gas_alkali', ['naoh', 'so2'], ['sodium bisulfite'], { T: 0, rate: { k: 0.5 } });
+  J('Gas + alkali', 'gas_alkali', ['koh', 'so2'], ['potassium sulfite', WATER], { T: 0, rate: { k: 0.5 } });
+  J('Thermal decomposition', 'decomp', ['sodium bisulfite'], ['sodium metabisulfite', WATER], { T: 150 });
+  J('Synthesis', 'gas_alkali', ['sodium sulfite', 'sulfur'], ['sodium thiosulfate'], { water: true, T: 90 });
+  J('Gas + alkali', 'gas_alkali', ['ammonia', 'co2', WATER], ['ammonium bicarbonate'], { T: 0, rate: { k: 0.3 } });
+  J('Gas + alkali', 'gas_alkali', ['ammonia', 'co2', WATER], ['ammonium carbonate'], { T: 0, rate: { k: 0.3 } });
+  J('Gas + alkali', 'gas_alkali', ['ammonia', 'hydrogen sulfide'], ['ammonium sulfide'], { T: 0, rate: { k: 0.3 } });
+  J('Gas + alkali', 'gas_alkali', ['caco3', 'co2', WATER], ['calcium bicarbonate'], { T: 0, rate: { k: 0.01 }, name: 'Hard water: limestone dissolves in carbonated water' });
+  J('Gas + alkali', 'gas_alkali', ['magnesium carbonate', 'co2', WATER], ['magnesium bicarbonate'], { T: 0, rate: { k: 0.01 } });
+  J('Disproportionation', 'gas_alkali', ['iodine', 'koh'], ['potassium iodate', 'potassium iodide', WATER], { T: 60 });
+  J('Disproportionation', 'gas_alkali', ['iodine', 'naoh'], ['sodium iodate', 'sodium iodide', WATER], { T: 60 });
+  J('Disproportionation', 'gas_alkali', ['bromine', 'naoh'], ['sodium bromate', 'sodium bromide', WATER], { T: 70 });
+  J('Disproportionation', 'gas_alkali', ['bromine', 'koh'], ['potassium bromate', 'potassium bromide', WATER], { T: 70 });
+  J('Disproportionation', 'gas_alkali', ['bromine', 'naoh'], ['sodium hypobromite', 'sodium bromide', WATER], { T: 0, maxT: 20 });
+  J('Oxidation', 'gas_alkali', ['iodine', 'nitric acid'], ['iodic acid', 'nitrogen dioxide', WATER], { T: 80 });
+  J('Dehydration', 'gas_alkali', ['iodic acid'], ['iodine pentoxide', WATER], { T: 200 });
+  J('Thermal decomposition', 'decomp', ['phosphoric acid'], ['pyrophosphoric acid', WATER], { T: 220 });
+  J('Thermal decomposition', 'decomp', ['disodium phosphate'], ['sodium pyrophosphate', WATER], { T: 400 });
+  J('Thermal decomposition', 'decomp', ['monosodium phosphate', 'disodium phosphate'], ['sodium tripolyphosphate', WATER], { T: 400 });
+  J('Thermal decomposition', 'decomp', ['monosodium phosphate'], ['sodium hexametaphosphate', WATER], { T: 600 });
+  J('Precipitation', 'precip', ['caoh2', 'phosphoric acid'], ['hydroxyapatite', WATER], { water: true, rate: { k: 2 }, name: 'Hydroxyapatite (the mineral of bones and teeth)' });
+  J('Precipitation', 'precip', ['mgcl2', 'ammonium chloride', 'disodium phosphate', 'ammonium hydroxide'], ['struvite', 'nacl', WATER], { water: true, rate: { k: 2 } });
+  J('Synthesis', 'synth', ['phosphorus_red', 'chlorine gas'], ['phosphorus trichloride'], { T: 60, rate: { k: 0.2 }, dH: -320 });
+  J('Synthesis', 'synth', ['phosphorus trichloride', 'chlorine gas'], ['phosphorus pentachloride'], { T: 20, rate: { k: 0.2 } });
+  J('Synthesis', 'synth', ['phosphorus_red', 'bromine'], ['phosphorus tribromide'], { T: 20, rate: { k: 0.2 } });
+  J('Hydrolysis', 'synth', ['phosphorus trichloride', WATER], ['phosphorous acid', 'hcl'], { rate: { k: 1 } });
+  J('Synthesis', 'synth', ['phosphorus_red', 'sulfur'], ['phosphorus pentasulfide'], { T: 300 });
+  J('Synthesis', 'synth', ['so2', 'chlorine gas'], ['sulfuryl chloride'], { cat: ['carbon'], T: 20 });
+  J('Synthesis', 'synth', ['so2', 'phosphorus pentachloride'], ['thionyl chloride', 'phosphoryl chloride'], { T: 20 });
+  J('Synthesis', 'synth', ['tin', 'chlorine gas'], ['tin(iv) chloride'], { T: 100, rate: { k: 0.2 } });
+  J('Synthesis', 'synth', ['gold', 'chlorine gas'], ['gold(iii) chloride'], { T: 200, rate: { k: 0.02 } });
+  J('Synthesis', 'synth', ['platinum', 'chlorine gas'], ['platinum(iv) chloride'], { T: 250, rate: { k: 0.01 } });
+  J('Synthesis', 'synth', ['iodine', 'chlorine gas'], ['iodine monochloride'], { T: 20, rate: { k: 0.2 } });
+  J('Synthesis', 'synth', ['bromine', 'chlorine gas'], ['bromine monochloride'], { T: 20, rate: { k: 0.2 } });
+  J('Synthesis', 'synth', ['nitric oxide', 'chlorine gas'], ['nitrosyl chloride'], { T: 20, rate: { k: 0.2 } });
+  J('Synthesis', 'synth', ['bismuth', 'chlorine gas'], ['bismuth(iii) chloride'], { T: 200 });
+  J('Redox', 'precip', ['cuso4_anh', 'potassium iodide'], ['copper(i) iodide', 'iodine', 'potassium sulfate'], { water: true, rate: { k: 2 }, name: 'Copper(II) sulfate and potassium iodide: white copper(I) iodide and brown iodine' });
+  J('Synthesis', 'synth', ['copper', 'cuo'], ['copper(i) oxide'], { T: 800 });
+  J('Synthesis', 'synth', ['copper', 'cucl2'], ['copper(i) chloride'], { water: true, T: 60 });
+  J('Synthesis', 'synth', ['iron', WATER], ['iron(ii,iii) oxide (magnetite)', 'h2'], { T: 500, name: 'Iron and steam: magnetite and hydrogen' });
+  J('Synthesis', 'synth', ['iron', WATER], ['iron_oxide_2', 'h2'], { T: 500 });
+  J('Oxidation', 'oxidise', ['lead(ii) oxide (litharge)', '@o2'], ['red lead (lead tetroxide)'], { T: 450 });
+  J('Oxidation', 'oxidise', ['red lead (lead tetroxide)', 'nitric acid'], ['lead(iv) oxide', 'lead(ii) nitrate', WATER], { T: 20 });
+  J('Oxidation', 'oxidise', ['tin', '@o2'], ['tin(iv) oxide'], { T: 600 });
+  J('Oxidation', 'oxidise', ['cobalt(ii) oxide', '@o2'], ['cobalt(ii,iii) oxide'], { T: 500 });
+  J('Oxidation', 'oxidise', ['potassium dichromate', 'sulfuric acid'], ['chromium trioxide', 'potassium bisulfate', WATER], { T: 20 });
+  J('Oxidation', 'oxidise', ['lithium', '@o2'], ['lithium oxide'], { T: 200, fx: [{ fx: 'flame', color: '#ff2a3a', size: 0.5 }] });
+  J('Reduction', 'oxidise', ['sodium peroxide', 'sodium'], ['sodium oxide'], { T: 200 });
+  J('Reduction', 'oxidise', ['potassium superoxide', 'potassium'], ['potassium oxide'], { T: 200 });
+  J('Oxidation', 'oxidise', ['titanium(iv) chloride', '@o2'], ['titanium dioxide', 'chlorine gas'], { T: 900 });
+  J('Oxidation', 'oxidise', ['boric acid'], ['boron trioxide', WATER], { T: 300 });
+  J('Acid + salt', 'acid_make', ['sodium borate (borax)', 'hcl'], ['boric acid', 'nacl'], { water: true, rate: { k: 2 } });
+  J('Acid + salt', 'acid_make', ['glass', 'hcl'], ['silicic acid', 'nacl'], { water: true, rate: { k: 2 } });
+  J('Alkali + oxide', 'ceramic', ['sodium borate (borax)', 'naoh'], ['sodium metaborate', WATER], { water: true, rate: { k: 2 } });
+  J('Peroxide', 'ceramic', ['sodium metaborate', 'h2o2'], ['sodium perborate', WATER], { water: true, rate: { k: 1 } });
+  J('Alkali + oxide', 'ceramic', ['al2o3', 'naoh'], ['sodium aluminate', WATER], { water: true, T: 150 });
+  J('Alkali + oxide', 'ceramic', ['zinc oxide', 'naoh'], ['sodium zincate', WATER], { water: true, T: 60 });
+  J('Alkali + oxide', 'ceramic', ['tin(iv) oxide', 'naoh'], ['sodium stannate', WATER], { water: true, T: 100 });
+  J('Roasting', 'ceramic', ['chromium(iii) oxide', 'na2co3', '@o2'], ['sodium chromate', 'co2'], { T: 1000, name: 'Roasting chromium oxide with soda: sodium chromate' });
+  J('Acid + chromate', 'chromate', ['sodium dichromate', 'ammonium chloride'], ['ammonium dichromate', 'nacl'], { water: true, rate: { k: 1 } });
+  J('Thermal decomposition', 'decomp', ['ammonium dichromate'], ['chromium(iii) oxide', 'nitrogen gas', WATER], { T: 180, dH: -300, fx: [{ fx: 'sparks', amount: 1 }, { fx: 'smoke', amount: 0.6, color: '#3f7a34' }], name: 'The ammonium dichromate volcano' });
+  for (const [a, b, c] of [['titanium dioxide', 'barium carbonate', 'barium titanate'], ['titanium dioxide', 'strontium carbonate', 'strontium titanate'], ['titanium dioxide', 'caco3', 'calcium titanate (perovskite)'], ['titanium dioxide', 'na2co3', 'sodium titanate']]) J('Solid-state reaction', 'ceramic', [a, b], [c, 'co2'], { T: 1100 });
+  for (const [a, b, c] of [['mgo', 'al2o3', 'magnesium aluminate (spinel)'], ['cobalt(ii) oxide', 'al2o3', 'cobalt aluminate (cobalt blue)'], ['zinc oxide', 'fe2o3', 'zinc ferrite'], ['cao', 'sio2', 'calcium silicate'], ['mgo', 'sio2', 'magnesium silicate'], ['mgo', 'sio2', 'olivine (forsterite)'], ['cao', 'sio2', 'portland cement (tricalcium silicate)'], ['cao', 'sio2', 'dicalcium silicate (belite)'], ['cao', 'al2o3', 'tricalcium aluminate'], ['al2o3', 'sio2', 'mullite'], ['al2o3', 'sio2', 'aluminum silicate'], ['mgo', 'al2o3', 'cordierite'], ['bismuth(iii) oxide', 'fe2o3', 'bismuth ferrite'], ['caco3', 'magnesium carbonate', 'dolomite']]) J('Solid-state reaction', 'ceramic', [a, b], [c], { T: 1200, name: `${nameOf(N(c))} from ${nameOf(res(a)).toLowerCase()} and ${nameOf(res(b)).toLowerCase()} (kiln)` });
+  J('Solid-state reaction', 'ceramic', ['mgo', 'al2o3', 'sio2'], ['cordierite'], { T: 1300 });
+  J('Solid-state reaction', 'ceramic', ['caco3', 'cuo', 'sio2'], ['egyptian blue', 'co2'], { T: 900, name: 'Egyptian blue: the oldest artificial pigment' });
+  J('Solid-state reaction', 'ceramic', ['lithium carbonate', 'cobalt(ii,iii) oxide', '@o2'], ['lithium cobalt oxide', 'co2'], { T: 900, name: 'Battery cathode: lithium cobalt oxide' });
+  J('Solid-state reaction', 'ceramic', ['lithium carbonate', 'manganese dioxide'], ['lithium manganese oxide', 'co2', O2], { T: 800 });
+  J('Solid-state reaction', 'ceramic', ['zinc sulfate', 'barium sulfide'], ['lithopone'], { water: true, rate: { k: 2 } });
+  J('Synthesis', 'ceramic', ['copper', 'acetic_acid', '@o2'], ['verdigris', WATER], { T: 20, rate: { k: 0.002 }, name: 'Verdigris: copper slowly greens in vinegar and air' });
+  J('Synthesis', 'ceramic', ['lead', 'acetic_acid', 'co2', '@o2'], ['lead white (basic lead carbonate)', 'lead white', WATER], { T: 20, rate: { k: 0.002 } });
+  J('Reduction', 'smelt', ['barium sulfate', 'carbon'], ['barium sulfide', 'carbon monoxide'], { T: 1000 });
+  J('Synthesis', 'ceramic', ['sodium aluminate', 'glass', WATER], ['zeolite (sodium a)', 'zeolite', 'naoh'], { T: 90 });
+  // hydrides and carbides
+  J('Gas in water', 'gas_alkali', ['ammonia', WATER], ['ammonium hydroxide'], { rate: { k: 1 }, dH: -35, name: 'Ammonia dissolves in water: ammonia solution' });
+  J('Gas in water', 'oxide_water', ['p4o10', WATER], ['phosphoric acid'], { rate: { k: 1 }, dH: -180 });
+  J('Hydride', 'gas_synth', ['magnesium', 'h2'], ['magnesium hydride'], { T: 400 });
+  J('Hydride', 'gas_synth', ['potassium', 'h2'], ['potassium hydride'], { T: 300 });
+  J('Hydride', 'gas_synth', ['lithium hydride', 'aluminum chloride'], ['lithium aluminum hydride', 'lithium chloride'], { T: 20, name: 'Lithium aluminium hydride from lithium hydride and aluminium chloride' });
+  J('Hydride', 'gas_synth', ['sodium hydride', 'trimethyl borate'], ['sodium borohydride', 'sodium methoxide'], { T: 250 });
+  J('Silicide', 'gas_synth', ['magnesium', 'silicon'], ['magnesium silicide'], { T: 600 });
+  J('Silicide', 'gas_synth', ['magnesium silicide', 'hcl'], ['silane', 'mgcl2'], { water: true, fx: [{ fx: 'sparks', amount: 0.6 }], name: 'Silane: a gas that catches fire by itself in air' });
+  J('Silicide', 'gas_synth', ['calcium', 'silicon'], ['calcium silicide'], { T: 1000 });
+  J('Silicide', 'gas_synth', ['iron', 'silicon'], ['iron silicide'], { T: 1200 });
+  J('Carbide', 'gas_synth', ['aluminium', 'carbon'], ['aluminum carbide'], { T: 1800 });
+  J('Synthesis', 'gas_synth', ['zinc', 'phosphorus_red'], ['zinc phosphide'], { T: 500 });
+  J('Synthesis', 'gas_synth', ['aluminium', 'phosphorus_red'], ['aluminum phosphide'], { T: 600 });
+  J('Synthesis', 'gas_synth', ['bismuth', 'sulfur'], ['bismuth(iii) sulfide'], { T: 300 });
+  J('Synthesis', 'gas_synth', ['iron', 'sulfur'], ['iron disulfide (pyrite)', 'iron disulfide'], { T: 450 });
+  J('Synthesis', 'gas_synth', ['lead', 'sulfur'], ['lead(ii) sulfide'], { T: 300 });
+  J('Synthesis', 'gas_synth', ['carbon disulfide', 'naoh'], ['sodium trithiocarbonate'], { T: 20 });
+  J('Synthesis', 'gas_synth', ['carbon monoxide', 'sulfur'], ['carbonyl sulfide'], { T: 300 });
+  J('Synthesis', 'gas_synth', ['sodium', 'sulfur'], ['sodium-sulfur battery (sodium polysulfide)', 'sodium polysulfide'], { T: 300 });
+  // double salts
+  J('Crystallisation', 'double_salt', ['feso4', 'ammonium sulfate'], ['ammonium iron(ii) sulfate (mohr\'s salt)'], { water: true, maxT: 40 });
+  J('Crystallisation', 'double_salt', ['potassium sulfate', 'aluminum sulfate'], ['potassium alum'], { water: true, maxT: 40 });
+  J('Crystallisation', 'double_salt', ['potassium bisulfate'], ['potassium persulfate', 'h2'], { T: 20, rate: { k: 0.001 } });
+  J('Neutralisation', 'neutral', ['koh', 'sulfuric acid'], ['potassium bisulfate', WATER], { water: true, rate: { k: 5 } });
+  // natural-to-lab sugars
+  J('Hydrolysis', 'sugar_split', ['starch', WATER], ['maltose'], { cat: ['yeast'], T: 40, maxT: 70, name: 'Starch to maltose (malting)' });
+  J('Hydrogenation', 'hydrogenate', ['fructose', 'h2'], ['mannitol'], { cat: ['nickel'], T: 120 });
+}
+for (const [k, v] of Object.entries({ gas_alkali: ['Gases and alkalis', 'Acidic gases (carbon dioxide, sulfur dioxide, chlorine, hydrogen sulfide) dissolve in alkalis and become salts. Limewater turning milky with carbon dioxide is this reaction.'], silicone: ['Silicon chemistry', 'Silicon joins with chloromethane over copper, and the products turn into silicones with water: the stuff of sealants and bakeware.'], ceramic: ['Kiln chemistry', 'Oxides fused in great heat make pigments, cement, spinels and battery materials.'], sulfur_org: ['Organic sulfur', 'Sulfur takes the place of oxygen in organic molecules: thiols smell of garlic and skunk, DMSO is a famous solvent.'], acyl: ['Acyl chlorides', 'Phosphorus trichloride turns carboxylic acids into acyl chlorides, which react fast with alcohols, amines and water.'] })) discOut.push({ id: 'rx_gen_' + k, name: v[0], cat: 'Reactions', hint: 'One of the families of reactions that make the 1,700 compounds.', fact: v[1] });
+for (const [k, v] of Object.entries({ contact: ['Contact process', 'Sulfur dioxide and oxygen join over hot vanadium oxide to make sulfur trioxide, the step behind almost all the world\'s sulfuric acid.'], haber: ['Haber process', 'Nitrogen from the air and hydrogen join over iron to make ammonia. Half the nitrogen in your body passed through this reaction as fertiliser.'], ostwald: ['Ostwald process', 'Ammonia burns on red-hot platinum to nitric oxide, which turns to brown nitrogen dioxide in air and then to nitric acid in water.'], gas_synth: ['Gas chemistry', 'Gases react with each other and with hot solids to make new compounds: hydrides, peroxides, nitrides, carbides.'], hydrogenate: ['Hydrogenation', 'Hydrogen adds across double bonds on a nickel catalyst. Turning liquid oil into solid fat (margarine) is the same reaction.'], syngas: ['Syngas chemistry', 'Carbon monoxide and hydrogen (syngas) are the starting point for methanol, acetic acid and much of the chemical industry.'], epoxide: ['Epoxides', 'Ethylene and oxygen on silver make ethylene oxide, a strained three-membered ring that opens easily into glycols.'], chlorinate: ['Chlorination', 'Chlorine and bromine swap in for hydrogen atoms or add across double bonds, making solvents, refrigerants and PVC.'], aromatic: ['Petrochemicals', 'Cracking, reforming and Friedel-Crafts reactions turn oil into benzene, styrene, phenol and the other building blocks of plastics.'], ammonia_chem: ['Ammonia chemistry', 'Ammonia becomes urea, amines, acrylonitrile and melamine.'] })) discOut.push({ id: 'rx_gen_' + k, name: v[0], cat: 'Reactions', hint: 'One of the families of reactions that make the 1,700 compounds.', fact: v[1] });
 for (const [k, v] of Object.entries({ smelt: ['Smelting', 'Carbon pulls the oxygen out of a metal oxide, leaving the metal. Zinc, lead and tin have been made this way for thousands of years.'], halogen: ['Freeing a halogen', 'An oxidiser takes electrons from chloride, bromide or iodide ions and frees the element: green chlorine, red-brown bromine, violet iodine.'], chromate: ['Chromate and dichromate', 'Yellow chromate turns orange dichromate in acid, and back again in alkali: one of the prettiest equilibria in chemistry.'], alkoxide: ['Metals in alcohols', 'Reactive metals fizz in alcohols as they do in water, more gently, giving hydrogen and an alkoxide.'], carbide: ['Carbide and acetylene', 'Calcium carbide and water make acetylene, the gas that lit old miners\' lamps.'], double_salt: ['Double salts', 'Two salts crystallising together into one crystal, like Mohr\'s salt and alum.'], dehydrate_org: ['Dehydrating alcohols', 'Hot acid pulls water out of an alcohol, leaving a double bond: an alkene.'], hydrate_org: ['Hydrating alkenes', 'An alkene and water join over an acid catalyst to make an alcohol. Industrial ethanol is made this way.'], bromine_test: ['The bromine test', 'Orange bromine water goes colourless with an alkene, because bromine adds across the double bond.'], haloalkane: ['Haloalkanes', 'An alcohol\'s -OH group swaps for a halogen atom when it meets a hydrogen halide.'], amine: ['Making amines', 'Ammonia pushes the halogen off a haloalkane, giving an amine: an organic cousin of ammonia.'], amide: ['Making amides', 'Acids and ammonia join, losing water, to make amides like acetamide.'], ether: ['Making ethers', 'Two alcohol molecules lose one water between them to make an ether. Diethyl ether was the first surgical anaesthetic.'], weak_acid: ['Strong acid frees a weak acid', 'A strong acid hands its hydrogen to the salt of a weak acid, freeing the weak acid. This is how soap curdles in acid.'] })) discOut.push({ id: 'rx_gen_' + k, name: v[0], cat: 'Reactions', hint: 'One of the families of reactions that make the 1,700 compounds.', fact: v[1] });
 
 // ---------- the starting chemicals (Normal Mode stockroom) and what can be reached from them ----------
 // Only basics that cannot be made from anything simpler in the lab. Everything else has to be made, step by step.
 const LAB = ['water', 'nahco3', 'acetic_acid', 'h2o2', 'yeast', 'sucrose', 'nacl', 'starch', 'oil', 'ethanol', 'hcl', 'naoh', 'citric', 'caco3', 'cuso4', 'alum', 'sodium', 'potassium', 'lithium', 'calcium', 'magnesium', 'iron', 'copper', 'carbon', 'aluminium', 'sulfur', 'phosphorus_red', 'mercury', 'silicon', 'gold'];
 const stockIds = new Set(NEW_ELEMENTS.map((x) => x.id));
-for (const n of ['bromine', 'iodine', 'sulfuric acid', 'nitric acid', 'phosphoric acid', 'hydrobromic acid', 'hydroiodic acid', 'ammonium hydroxide', 'potassium hydroxide', 'potassium permanganate', 'potassium dichromate', 'sodium thiosulfate', 'sodium sulfite', 'sodium fluoride', 'potassium thiocyanate', 'methanol', '1-propanol', 'isopropanol', '1-butanol', 'benzyl alcohol', 'isoamyl alcohol', 'cyclohexanol', 'salicylic acid', 'lactic acid', 'acetic anhydride', 'ethylene glycol', 'styrene', 'methyl methacrylate', 'vinyl acetate', 'caprolactam', 'adipic acid', 'hexamethylenediamine', 'terephthalic acid', 'hexane']) { const id = named(n); if (id && !pool.get(id).banned) stockIds.add(id); }
+for (const n of ['bromine', 'iodine', 'hydrobromic acid', 'hydroiodic acid', 'ammonium hydroxide', 'potassium hydroxide', 'potassium permanganate', 'potassium dichromate', 'sodium thiosulfate', 'sodium sulfite', 'sodium fluoride', 'potassium thiocyanate', 'methanol', '1-propanol', 'isopropanol', '1-butanol', 'benzyl alcohol', 'isoamyl alcohol', 'cyclohexanol', 'salicylic acid', 'lactic acid', 'acetic anhydride', 'ethylene glycol', 'styrene', 'methyl methacrylate', 'vinyl acetate', 'caprolactam', 'adipic acid', 'hexamethylenediamine', 'terephthalic acid', 'hexane', 'eicosane', 'naphthalene', 'anthracene', 'titanium dioxide', 'sodium borate (borax)', 'tripalmitin', 'xylose', 'bismuth', 'pyridine', 'methacrylic acid', 'caprolactone', 'sebacic acid', 'malonic acid', 'levulinic acid', 'p-phenylenediamine']) { const id = named(n); if (id && !pool.get(id).banned) stockIds.add(id); }
 const stock = [...stockIds];
-const reachDepth = new Map([...LAB, ...stockIds, 'o2'].map((id) => [id, 0]));
+// the catalyst table: things that speed reactions up without being used up
+const CATALYSTS = ['vanadium(v) oxide', 'platinum', 'nickel', 'iron', 'aluminum chloride', 'iron(iii) chloride', 'iron(iii) bromide', 'silver', 'titanium(iv) chloride', 'chromium(iii) oxide', 'bismuth(iii) oxide', 'molybdenum(vi) oxide', 'al2o3', 'cobalt', 'zinc chloride', 'zinc oxide', 'manganese dioxide', 'yeast', 'sulfuric acid', 'phosphoric acid', 'potassium dichromate', 'potassium permanganate', 'copper'].map((n) => (pool.has(n) ? n : named(n))).filter((id) => id && has(id));
+const reachDepth = new Map([...LAB, ...stockIds, ...CATALYSTS, 'o2', named('nitrogen gas')].filter(Boolean).map((id) => [id, 0]));
 for (let round = 1; round < 12; round++) {
   let grew = false;
   for (const r of [...BASE_RX, ...RXS]) {
@@ -641,8 +1073,14 @@ discOut.unshift(...Object.entries(FAMILY).map(([k, [name, fact]]) => ({ id: 'rx_
 
 writeFileSync(resolve(root, 'data/compounds.json'), '{"elements":' + JSON.stringify(NEW_ELEMENTS) + ',\n"aliases":' + JSON.stringify(aliasOf) + ',\n"substances":[\n' + subsOut.map((s) => JSON.stringify(s)).join(',\n') + '\n]}\n');
 writeFileSync(resolve(root, 'data/reactions-gen.json'), '[\n' + RXS.map((r) => JSON.stringify(r)).join(',\n') + '\n]\n');
-writeFileSync(resolve(root, 'data/stock.json'), JSON.stringify({ reagents: stock, discoveries: discOut }, null, 0) + '\n');
+writeFileSync(resolve(root, 'data/stock.json'), JSON.stringify({ reagents: stock, catalysts: CATALYSTS, discoveries: discOut }, null, 0) + '\n');
 const makeable = subsOut.filter((s) => madeBy.get(s.id)).length;
 console.log(`reachable from the starting chemicals: ${[...reachDepth.keys()].length} substances (new compounds: ${subsOut.filter((x) => reachDepth.has(x.id)).length}); entries ${entries.length}; already in game ${entries.length - out.length}; new substances ${subsOut.length}; reactions ${RXS.length}; makeable new substances ${makeable}; banned ${subsOut.filter((s) => s.banned).length}; reference-only ${subsOut.filter((s) => s.reference).length}; stock ${stock.length}`);
 const fam = {}; for (const r of RXS) fam[r.discovery] = (fam[r.discovery] || 0) + 1; console.log(fam);
 const multi = [...madeBy.values()].filter((n) => n >= 2).length; console.log('made 2+ ways:', multi);
+
+if (process.env.REPORT) {
+  const left = {};
+  for (const x of subsOut) { if (x.banned || x.reference || reachDepth.has(x.id)) continue; (left[x.group] ||= []).push(x.name + (madeBy.get(x.id) ? '*' : '')); }
+  for (const k in left) console.log(k, left[k].length, ':', left[k].slice(0, 40).join('; '));
+}

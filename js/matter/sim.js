@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { SUB, DISC, stateAt } from '../chem/db.js';
-import { stepMixture, stepBoil, observe, burnGas } from '../chem/engine.js';
+import { stepMixture, stepBoil, observe, burnGas, releaseGases } from '../chem/engine.js';
 import { play } from '../core/audio.js';
 import { G_STATIC } from '../physics/world.js';
 
@@ -55,6 +55,8 @@ export function createSim(G) {
       const env = { open: true, air: h.air ?? 1, ignition, areaCm2: h.kind === 'vessel' ? Math.PI * h.def.rimR * h.def.rimR * 1e4 : h.kind === 'puddle' ? Math.PI * h.r * h.r * 1e4 : 4 };
       const events = stepMixture(mix, TICK, env);
       const boil = stepBoil(mix, TICK);
+      const freed = releaseGases(mix);
+      if (freed) G.gas.puff(G.matter.topOf(h, p2), freed, Math.max(mix.T, 20), { vy: 0.3 });
       // lose heat to the room: convection always, radiation once it glows
       const C2 = Math.max(mix.heatCap(), 0.05);
       let area, kA;

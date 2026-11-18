@@ -1,4 +1,4 @@
-import { SUB, RX, DISC_LIST, equationOf, recipe, isStarter } from './chem/db.js';
+import { SUB, RX, DISC_LIST, equationOf, recipe, isStarter, CATALYSTS } from './chem/db.js';
 import { ELEMENTS } from './chem/formula.js';
 import { MATS, GOALS, UNLOCKS } from './story-data.js';
 
@@ -82,7 +82,8 @@ export function createAssistant() {
     const ins = rx.inputs.filter((i) => i.from !== 'air').map((i) => lc(SUB[i.id].name));
     steps.push((ins.length > 1 ? 'Put ' + list(ins) + ' together' : 'Put ' + ins[0] + ' in a container') + (rx.requires ? ' with ' + list(rx.requires.map((r) => lc(SUB[r.id].name))) : '') + '.');
     if (c.minSurf) steps.push('Solids must be powdered: crush lumps with the rock pick (Story Mode) or use powders.');
-    if (rx.catalysts) steps.push('It needs a catalyst: ' + list(rx.catalysts.map((k) => lc(SUB[k.id].name))) + '.');
+    if (rx.catalysts) steps.push('It needs a catalyst' + (rx.catalysts.length > 1 ? ' (any one of these)' : '') + ': ' + list(rx.catalysts.map((k) => lc(SUB[k.id].name))) + (rx.catalysts.some((k) => CATALYSTS.includes(k.id)) ? ', from the catalyst table' : '') + '.');
+    if (rx.inputs.some((i) => SUB[i.id].state === 'g' && i.from !== 'air')) steps.push('Gases only stay in the container when something there can react with them, so do it all in one container.');
     if (rx.inputs.some((i) => i.from === 'air')) steps.push('It needs air, so use an open container.');
     if (c.minTemp) steps.push(`Heat it above ${c.minTemp} °C${c.minTemp > 800 ? ' (in Story Mode that needs the big burner unlock)' : c.minTemp > 150 ? ': a crucible on the tripod over a lit Bunsen burner works' : ': the hot plate or a burner works'}.`);
     if (c.ignition) steps.push('It needs a spark or flame to start: a burner or the lighter.');
@@ -170,7 +171,7 @@ export function createAssistant() {
     const realMade = [...made, ...(id === 'soap' ? RX.filter((r) => r.discovery === 'rx_gen_soap') : [])].filter((r) => !r.inputs.some((i) => i.id !== id && SUB[i.id].name.toLowerCase().includes(n))).sort((a, b) => rank(a) - rank(b));
     const loop = made.filter((r) => !realMade.includes(r));
     const getIt = [`**How to get ${n}${(EXTRA_ALIASES[id] || [])[0] && !n.includes(EXTRA_ALIASES[id][0]) ? ' (' + EXTRA_ALIASES[id][0] + ')' : ''}.**`,
-      id === 'water' ? 'Normal Mode: turn on the cold tap at the sink (F), or use the distilled water bottle on the island bench.' : isStarter(id) && !WHERE[id] ? 'Normal Mode: it is one of the starting chemicals on the shelves in the storage room (through the door in the east wall of the lab).' : WHERE[id] ? `Normal Mode: it is ${SPOT[WHERE[id]]}.` : s.supply ? 'Normal Mode: it is on the lab shelves.' : '',
+      id === 'water' ? 'Normal Mode: turn on the cold tap at the sink (F), or use the distilled water bottle on the island bench.' : CATALYSTS.includes(id) && !isStarter(id) && !WHERE[id] ? 'Normal Mode: a little is on the catalyst table (by the restock lever) for speeding up reactions. To have more, make it.' : isStarter(id) && !WHERE[id] ? 'Normal Mode: it is one of the starting chemicals on the shelves in the storage room (through the door in the east wall of the lab).' : WHERE[id] ? `Normal Mode: it is ${SPOT[WHERE[id]]}.` : s.supply ? 'Normal Mode: it is on the lab shelves.' : '',
       mat ? `Story Mode: ${mat.where}${/kitchen/i.test(mat.how) ? '' : ' (' + lc(mat.how) + ').'}` : WHERE[id] || s.supply ? `Story Mode: it cannot be found outside, so it is not available there yet.` : '',
       realMade.length && id !== 'water' ? `${WHERE[id] || mat ? 'You can also make it' : realMade.length > 1 ? `There are ${realMade.length} ways to make it` : 'Make it'}:\n` + realMade.slice(0, 4).map((r, k) => `${k + 1}. **${r.name}**: ${how(r)}`).join('\n') + (realMade.length > 4 ? `\n...and ${realMade.length - 4} more (ask "what makes ${n}").` : '') : '',
       loop.length ? `(${loop.map((r) => r.name).join(', ')} only turns another form of ${n} back into ${n}, so you need some to start with.)` : '',

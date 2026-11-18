@@ -175,3 +175,19 @@ test('every compound from the list is a substance, and makeable ones have routes
   assert.ok(Object.keys(SUB).length > 1650, 'about 1,700 substances: ' + Object.keys(SUB).length);
   assert.ok(RX.length > 1200);
 });
+test('contact process: burning sulfur over vanadium oxide gives sulfur trioxide, then sulfuric acid', () => {
+  const v2o5 = byName('vanadium(v) oxide'), so3 = byName('sulfur trioxide'), h2so4 = byName('sulfuric acid');
+  const m = new Mixture(450); m.add('sulfur', 0.1, 450, 1); m.add(v2o5, 0.02, 450, 1);
+  let leaked = 0;
+  for (let i = 0; i < 600; i++) { m.T = 450; for (const e of stepMixture(m, 0.1, { air: 1, ignition: true })) leaked += e.emit.so2 || 0; }
+  assert.ok(m.get(so3) > 0.02, 'sulfur trioxide forms: ' + m.get(so3));
+  m.T = 20; m.add('water', 5);
+  for (let i = 0; i < 100; i++) stepMixture(m, 0.1, {});
+  assert.ok(m.get(h2so4) > 0.02, 'sulfuric acid forms');
+});
+test('without the catalyst, sulfur dioxide escapes', () => {
+  const m = new Mixture(450); m.add('sulfur', 0.1, 450, 1);
+  let leaked = 0;
+  for (let i = 0; i < 600; i++) { m.T = 450; for (const e of stepMixture(m, 0.1, { air: 1, ignition: true })) leaked += e.emit.so2 || 0; }
+  assert.ok(leaked > 0.05 && !m.get(byName('sulfur trioxide')));
+});

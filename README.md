@@ -91,7 +91,13 @@ Every compound in `tools/compounds-source.md` (1,701 of them, plus three soaps) 
 - salts that cannot be made from anything simpler here: permanganate, dichromate, thiosulfate and similar;
 - basic organic chemicals: alcohols, a few monomers.
 
-A **catalyst table** by the restock lever holds manganese dioxide, yeast, sulfuric and phosphoric acid (droppers), zinc chloride, potassium dichromate and potassium permanganate. Everything else has to be made from these, often in several steps. For example, copper hydroxide is made by dissolving copper in nitric acid and then precipitating it with sodium hydroxide. About 270 of the new compounds can be reached this way. Ask the Lab Assistant "how do I make X" and it gives the steps in order from the starting chemicals. Story Mode keeps its own rule: everything is found outside.
+A **catalyst table** by the restock lever holds 21 catalysts. Among them: vanadium oxide, platinum, nickel, iron, aluminium chloride, iron(III) chloride, titanium chloride, silver, cobalt, chromium oxide, manganese dioxide, zinc chloride, and droppers of sulfuric and phosphoric acid.
+
+**Gases react before they escape.** A gas made in a container stays there if something in the container can react with it. Otherwise it drifts off as before. This makes the big industrial processes playable:
+- Burn sulfur with vanadium oxide at 400 °C and the sulfur dioxide becomes sulfur trioxide (contact process). Add water and you have sulfuric acid.
+- Others: Haber ammonia on iron, the Ostwald route to nitric acid on platinum, hydrogenation on nickel, methanol from syngas on copper, Friedel-Crafts on aluminium chloride, polymerisation, cracking and reforming.
+
+Sulfuric, nitric and phosphoric acid are no longer on the shelves: make them. About 610 of the new compounds can be made from the starting chemicals, some through chains of five to seven steps. Everything else has to be made from these, often in several steps. For example, copper hydroxide is made by dissolving copper in nitric acid and then precipitating it with sodium hydroxide. About 610 of the new compounds can be reached this way. Ask the Lab Assistant "how do I make X" and it gives the steps in order from the starting chemicals. Story Mode keeps its own rule: everything is found outside.
 
 ## Lab Assistant
 

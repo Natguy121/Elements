@@ -28,6 +28,7 @@ for (const raw of [...substances, ...compounds.elements, ...compounds.substances
 // other names for substances the game already had (minerals, IUPAC names): "Halite" is table salt
 for (const id in compounds.aliases) if (SUB[id]) SUB[id].aka = compounds.aliases[id];
 export const STOCK = stock.reagents.filter((id) => SUB[id]);
+export const CATALYSTS = (stock.catalysts || []).filter((id) => SUB[id]);
 export const RX = [...reactions, ...genReactions];
 export const RXI = Object.fromEntries(reactions.map((r) => [r.id, r]));
 export const DISC = Object.fromEntries([...discoveries, ...stock.discoveries].map((d) => [d.id, d]));
@@ -85,7 +86,9 @@ export function stateAt(s, T) {
 
 // ---------- recipes: the shortest chain of steps from the lab's starting chemicals to a substance ----------
 export const LAB_START = ['water', 'nahco3', 'acetic_acid', 'h2o2', 'yeast', 'sucrose', 'nacl', 'starch', 'oil', 'ethanol', 'hcl', 'naoh', 'citric', 'caco3', 'cuso4', 'alum', 'sodium', 'potassium', 'lithium', 'calcium', 'magnesium', 'iron', 'copper', 'carbon', 'aluminium', 'sulfur', 'phosphorus_red', 'mercury', 'silicon', 'gold', 'o2'];
-const START = new Set([...LAB_START, ...STOCK]);
+// catalysts are on the table to speed things up; as ingredients they still have to be made
+const START = new Set([...LAB_START, ...STOCK, 'nitrogen_gas']);
+const CAT_OK = new Set([...START, ...CATALYSTS]);
 const via = new Map(); // substance -> { rx, depth }
 for (const id of START) via.set(id, { rx: null, depth: 0 });
 // prefer the classic routes when several are equally short
@@ -98,7 +101,7 @@ for (let round = 1; round < 14; round++) {
     const ins = r.inputs.filter((x) => x.from !== 'air').map((x) => x.id);
     if (!ins.every((id) => via.has(id) && via.get(id).depth < round)) continue;
     if (r.requires && !r.requires.every((x) => via.has(x.id))) continue;
-    if (r.catalysts && r.rate.k < 0.001 && !r.catalysts.some((c) => via.has(c.id))) continue;
+    if (r.catalysts && r.rate.k < 0.001 && !r.catalysts.some((c) => via.has(c.id) || CAT_OK.has(c.id))) continue;
     for (const o of r.outputs) if (!via.has(o.id)) { via.set(o.id, { rx: r, depth: round }); grew = true; }
   }
   if (!grew) break;

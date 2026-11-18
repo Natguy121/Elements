@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as T from './textures.js';
-import { SUB, STOCK } from '../chem/db.js';
+import { SUB, STOCK, CATALYSTS } from '../chem/db.js';
 import { CHUNK } from '../chem/mixture.js';
 import { play } from '../core/audio.js';
 import { solidBox, makeDoor } from './door.js';
@@ -415,12 +415,13 @@ export function buildLab(G) {
     m.place(m.makeProp('crate'), 5.9, 0, 2.2, 0.2); m.place(m.makeProp('crate'), 5.9, 0.37, 2.2, -0.1); m.place(m.makeProp('crateS'), 5.3, 0, 2.0, 0.5);
     m.place(m.makeProp('crateS'), 0.2, 0, 2.6, 0.3);
     m.place(m.makeProp('gascyl'), 6.4, 0, 4.2); m.place(m.makeProp('barrel'), 5.5, 0, 4.2);
-    // the catalyst table
-    [['manganese_dioxide', 'jar', 'Speeds up peroxide splitting'], ['yeast', 'jar', 'Catalase enzyme'], ['sulfuric_acid', 'dropper', 'Esters, ethers, dehydration'], ['phosphoric_acid', 'dropper', 'Alkenes and alcohols'], ['zinc_chloride', 'jar', 'Haloalkanes'], ['potassium_dichromate', 'jar', 'Oxidising alcohols'], ['potassium_permanganate', 'jar', 'Strong oxidiser']].forEach(([id, type, note], i) => {
+    // the catalyst table: everything that speeds a reaction up without being used up
+    CATALYSTS.forEach((id, i) => {
       const s = SUB[id]; if (!s) return;
-      const it = m.makeVessel(type, { label: s.name, formula: note, tags: [...(s.tags || [])], accent: '#ffc21a' });
-      if (type === 'dropper') { m.fill(it, id, 0.08); } else m.fill(it, id, Math.min(0.4, 40 / s.M));
-      m.place(it, CT.x + (i % 2 ? 0.13 : -0.13), BENCH, CT.z - 0.5 + i * 0.16, Math.PI / 2);
+      const liquid = s.state === 'l' || s.acid;
+      const it = m.makeVessel(liquid ? 'dropper' : 'jar', { label: s.name.replace(/\s*\(.*?\)/g, ''), formula: 'catalyst', tags: [...(s.tags || [])], accent: '#ffc21a' });
+      if (liquid) m.fill(it, id, 0.08); else m.fill(it, id, Math.min(0.4, 40 / s.M), 1);
+      m.place(it, CT.x + ((i % 3) - 1) * 0.18, BENCH, CT.z - 0.56 + Math.floor(i / 3) * 0.15, Math.PI / 2);
       it.info = s;
     });
     // the stockroom: the starting chemicals everything else is made from

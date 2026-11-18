@@ -64,7 +64,7 @@ export function stepMixture(mix, dt, env = {}) {
     const emit = {};
     for (const out of rx.outputs) {
       const s = SUB[out.id], mol = out.mol * extent;
-      if (stateAt(s, Math.max(mix.T, 20)) === 'g' && !env.sealed) emit[out.id] = (emit[out.id] || 0) + mol;
+      if (stateAt(s, Math.max(mix.T, 20)) === 'g' && !env.sealed && !canConsume(mix, out.id, rx)) emit[out.id] = (emit[out.id] || 0) + mol;
       else if (rx.sustain && needsAir && s.id === 'water') emit.water = (emit.water || 0) + mol; // flames give steam, not liquid
       else mix.add(out.id, mol, mix.T, s.state === 's' ? (rx.productSurf ?? 1) : undefined);
     }
@@ -136,3 +136,37 @@ export function observe(mix) {
 }
 
 export const isOxideOrAsh = (id) => ['mgo', 'al2o3', 'cuo', 'fe2o3', 'fes'].includes(id);
+
+// A gas made in a container stays there (bubbling through it) if something in the container can react with it:
+// sulfur dioxide over a vanadium oxide catalyst, hydrogen over nickel with an alkene, and so on.
+// Otherwise it escapes into the room.
+export function canConsume(mix, gasId, made) {
+  const list = RX_BY_INPUT[gasId];
+  if (!list) return false;
+  const also = made ? new Set(made.outputs.map((o) => o.id)) : null;
+  for (const r of list) {
+    if (r.phase === 'gas' || r === made) continue;
+    let ok = true;
+    for (const i of r.inputs) {
+      if (i.from === 'air' || i.id === gasId) continue;
+      if (!((mix.n[i.id] || 0) > 1e-7) && !(also && also.has(i.id))) { ok = false; break; }
+    }
+    if (!ok) continue;
+    if (r.catalysts && r.rate.k < 0.001 && !r.catalysts.some((c) => (mix.n[c.id] || 0) > 0)) continue;
+    if (r.conditions && r.conditions.maxTemp !== undefined && mix.T > r.conditions.maxTemp + 50) continue;
+    if (r.conditions && r.conditions.minTemp !== undefined && mix.T < r.conditions.minTemp - 80) continue;
+    return true;
+  }
+  return false;
+}
+// gases that are sitting in a mixture with nothing left to react with drift off
+export function releaseGases(mix) {
+  let out = null;
+  for (const id in mix.n) {
+    const s = SUB[id];
+    if (s.state !== 'g' || s.hvap || canConsume(mix, id)) continue;
+    (out ||= {})[id] = mix.n[id];
+    mix.remove(id, mix.n[id]);
+  }
+  return out;
+}

@@ -82,9 +82,16 @@ Every compound in `tools/compounds-source.md` (1,701 of them, plus three soaps) 
 
   Every equation is balanced by solving for its coefficients, and the tests check atoms and mass for all of them.
 - **Not makeable:** medicines and natural products (drugs, alkaloids, vitamins and so on) are in the book for reference only. Explosives, chemical weapons and very toxic chemicals (cyanides, arsenic, thallium, cadmium, azides, perchlorates and similar) cannot be made or ordered.
-- **Real-world origin:** compounds that real labs buy rather than make, such as hydrocarbons from oil and minerals from mines, say where they really come from.
+- **Real-world origin:** compounds that cannot be reached from the starting chemicals, such as hydrocarbons from oil and minerals from mines, say where they really come from.
 
-**Chemical supply (Normal Mode).** A terminal on the west wall (F) opens a catalogue of about 1,260 chemicals. Orders arrive on the cart below it. Gases, medicines and banned chemicals cannot be ordered. Story Mode keeps the rule that everything is found, so the terminal is closed there.
+**Making things in steps.** Nothing can be bought. Normal Mode's storage room (through the door in the lab's east wall) holds 41 starting chemicals, on top of what the lab already had:
+- metals: zinc, tin, lead, nickel, silver, manganese, chromium, cobalt, barium, strontium;
+- bromine and iodine;
+- acids and alkalis: sulfuric, nitric, phosphoric, hydrobromic and hydroiodic acid, potassium hydroxide, ammonia solution;
+- salts that cannot be made from anything simpler here: permanganate, dichromate, thiosulfate and similar;
+- basic organic chemicals: alcohols, a few monomers.
+
+Everything else has to be made from these, often in several steps. For example, copper hydroxide is made by dissolving copper in nitric acid and then precipitating it with sodium hydroxide. About 270 of the new compounds can be reached this way. Ask the Lab Assistant "how do I make X" and it gives the steps in order from the starting chemicals. Story Mode keeps its own rule: everything is found outside.
 
 ## Lab Assistant
 
@@ -200,7 +207,6 @@ Every locked element already has a real source mineral, a processing method and 
 | `js/matter/` | Containers, lumps, props, pouring, spills, breakage (`items.js`), gas clouds and explosions (`gas.js`), and the simulation loop tying heat, reactions and effects together (`sim.js`) |
 | `js/world/` | The lab room and its fixtures, the Story Mode outdoors (`outdoors.js`), doors, and all canvas-painted textures |
 | `tools/gen-compounds.mjs`, `data/compounds.json`, `data/reactions-gen.json`, `data/stock.json` | The 1,700-compound expansion |
-| `js/ui/supply.js` | The chemical supply catalogue |
 | `js/assistant.js`, `js/ui/ask.js` | The offline Lab Assistant and its chat window |
 | `js/net.js` | Multiplayer: room codes, host snapshots, guest input, avatars |
 | `js/story.js`, `js/story-data.js`, `data/materials.json` | Story Mode: gathering, storage and saving, goals, unlocks, the 18 materials |

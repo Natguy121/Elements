@@ -1,4 +1,4 @@
-import { SUB, RX, DISC_LIST, equationOf } from './chem/db.js';
+import { SUB, RX, DISC_LIST, equationOf, recipe, isStarter } from './chem/db.js';
 import { ELEMENTS } from './chem/formula.js';
 import { MATS, GOALS, UNLOCKS } from './story-data.js';
 
@@ -90,6 +90,14 @@ export function createAssistant() {
     if (c.blockedBy) steps.push('It does not happen while ' + list(c.blockedBy.map((b) => lc(SUB[b].name))) + ' is still there.');
     return steps.join(' ');
   }
+  // "Step 1: make A. Step 2: use A to make B." from the starting chemicals
+  function stepText(id) {
+    if (isStarter(id)) return '';
+    const r = recipe(id);
+    if (!r || !r.length) return r === null && (MADE_BY_ANY(id)) ? `\n(None of those can be started from the lab's starting chemicals yet.)` : '';
+    return `\n**Step by step from the starting chemicals${r.length > 1 ? ` (${r.length} steps)` : ''}:**\n` + r.map((x, k) => `Step ${k + 1}: ${x.name}. ${how(x)}`).join('\n');
+  }
+  const MADE_BY_ANY = (id) => RX.some((r) => r.outputs.some((o) => o.id === id));
   const makes = (rx) => list(rx.outputs.map((o) => lc(SUB[o.id].name)));
   const why = (rx) => { const d = DISC_LIST.find((x) => x.id === rx.discovery); return d && d.fact ? d.fact : ''; };
   const rxText = (rx) => `**${rx.name}** (${rx.kind}): ${equationOf(rx)}. It makes ${makes(rx)}. ${how(rx)} ${why(rx)}`.trim();
@@ -123,13 +131,15 @@ export function createAssistant() {
     const sid = subOfEl(e) || Object.keys(SUB).find((k) => SUB[k].formula === e.sym + '2' || SUB[k].formula === e.sym), s = sid && SUB[sid], bits = [];
     const made = sid ? RX.filter((r) => r.outputs.some((o) => o.id === sid)) : [];
     const mats = MATS.filter((m) => SUB[m.sub] && SUB[m.sub].el === e.sym);
-    if (e.start) {
-      if (e.state !== 'gas' && s && s.supply) bits.push(`In Normal Mode ${lc(e.name)} is on the element storage shelves (west wall of the lab).`);
+    const starter = sid && isStarter(sid);
+    if (e.start || starter) {
+      if (starter && !WHERE[sid] && e.state !== 'gas') bits.push(`In Normal Mode ${lc(e.name)} is one of the starting chemicals on the storage room shelves (through the door in the east wall).`);
+      else if (e.state !== 'gas' && s && s.supply) bits.push(`In Normal Mode ${lc(e.name)} is on the element storage shelves (west wall of the lab).`);
       else if (e.state === 'gas') bits.push(`${e.name} is a gas, so you cannot hold a sample in an open container: it drifts off as a cloud.`);
       else bits.push(`${e.name} is one of the starting elements.`);
     } else bits.push(`${e.name} is locked (tier ${e.tier || '?'}). It needs equipment from a later update.`);
     if (e.start && !mats.length && e.state !== 'gas') bits.push('Story Mode: it is not found outside, so it is not available there yet.');
-    if (made.length) bits.push(`You can make it: ${made.map((r) => `${r.name}. ${how(r)}`).join(' Or: ')}`);
+    if (made.length) bits.push(`You can make it: ${made.slice(0, 2).map((r) => `${r.name}. ${how(r)}`).join(' Or: ')}${made.length > 2 ? ` (and ${made.length - 2} more ways)` : ''}`);
     if (mats.length) bits.push(`In Story Mode: ${mats.map((m) => `${m.name}: ${m.where}`).join(' ')}`);
     const real = REAL[e.sym] || [e.hint, e.method && 'Method: ' + e.method].filter(Boolean).join(' ');
     if (real) bits.push(`In real life: ${real}`);
@@ -160,10 +170,11 @@ export function createAssistant() {
     const realMade = [...made, ...(id === 'soap' ? RX.filter((r) => r.discovery === 'rx_gen_soap') : [])].filter((r) => !r.inputs.some((i) => i.id !== id && SUB[i.id].name.toLowerCase().includes(n))).sort((a, b) => rank(a) - rank(b));
     const loop = made.filter((r) => !realMade.includes(r));
     const getIt = [`**How to get ${n}${(EXTRA_ALIASES[id] || [])[0] && !n.includes(EXTRA_ALIASES[id][0]) ? ' (' + EXTRA_ALIASES[id][0] + ')' : ''}.**`,
-      id === 'water' ? 'Normal Mode: turn on the cold tap at the sink (F), or use the distilled water bottle on the island bench.' : WHERE[id] ? `Normal Mode: it is ${SPOT[WHERE[id]]}.` : s.supply ? 'Normal Mode: it is on the lab shelves.' : '',
+      id === 'water' ? 'Normal Mode: turn on the cold tap at the sink (F), or use the distilled water bottle on the island bench.' : isStarter(id) && !WHERE[id] ? 'Normal Mode: it is one of the starting chemicals on the shelves in the storage room (through the door in the east wall of the lab).' : WHERE[id] ? `Normal Mode: it is ${SPOT[WHERE[id]]}.` : s.supply ? 'Normal Mode: it is on the lab shelves.' : '',
       mat ? `Story Mode: ${mat.where}${/kitchen/i.test(mat.how) ? '' : ' (' + lc(mat.how) + ').'}` : WHERE[id] || s.supply ? `Story Mode: it cannot be found outside, so it is not available there yet.` : '',
       realMade.length && id !== 'water' ? `${WHERE[id] || mat ? 'You can also make it' : realMade.length > 1 ? `There are ${realMade.length} ways to make it` : 'Make it'}:\n` + realMade.slice(0, 4).map((r, k) => `${k + 1}. **${r.name}**: ${how(r)}`).join('\n') + (realMade.length > 4 ? `\n...and ${realMade.length - 4} more (ask "what makes ${n}").` : '') : '',
       loop.length ? `(${loop.map((r) => r.name).join(', ')} only turns another form of ${n} back into ${n}, so you need some to start with.)` : '',
+      stepText(id),
       !realMade.length && !s.supply && !mat ? (s.fact && /reference|dangerous|cannot be made|In real life/.test(s.fact) ? s.fact.replace(/^.*?Category: [^.]*\.\s*/, '') : 'It cannot be made in the game yet.') : '',
       !realMade.length && !s.supply && !mat && !s.banned && !s.reference ? '' : ''].filter(Boolean).join(' ');
     put('sub:' + id, 'get', [`how do I make ${n}`, `how to get ${n}`, `where does ${n} come from`, `where do I find ${n}`], getIt);

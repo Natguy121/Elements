@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as T from './textures.js';
-import { SUB } from '../chem/db.js';
+import { SUB, STOCK } from '../chem/db.js';
 import { CHUNK } from '../chem/mixture.js';
 import { play } from '../core/audio.js';
 import { solidBox, makeDoor } from './door.js';
@@ -290,13 +290,14 @@ export function buildLab(G) {
   { const sg = am(new THREE.PlaneGeometry(1.2, 0.26), std({ map: T.signTex(['STORAGE ROOM'], '#12202b', '#e8ecec', 640, 140, false), roughness: 0.6 }), X1 - 0.012, 2.4, 1.6); sg.rotation.y = -Math.PI / 2; sg.castShadow = false; }
   { const sg = am(new THREE.PlaneGeometry(2.4, 0.4), std({ map: T.signTex(['SAMPLE STORAGE'], '#12202b', '#e8ecec', 1024, 170, false), roughness: 0.6 }), SX1 - 0.012, 2.55, 2.5); sg.rotation.y = -Math.PI / 2; sg.castShadow = false; }
   const annexDoor = makeDoor(G, { x: X1 + 0.15, z: 1.1, a0: -Math.PI / 2, a1: -0.15, mat: std({ color: 0x66757c, roughness: 0.45 }), name: 'Storage room door' });
-  annexDoor.show(false); annexDoor.fixture.off = () => !G.story;
+  annexDoor.show(false);
   fixtures.push(annexDoor.fixture);
   function setStory(on) {
-    eastFull.mesh.visible = !on; for (const e of eastSplit) e.mesh.visible = on;
-    if (on) { phys.world.removeBody(eastFull.body); for (const e of eastSplit) phys.world.addBody(e.body); }
-    else { for (const e of eastSplit) phys.world.removeBody(e.body); if (!phys.world.bodies.includes(eastFull.body)) phys.world.addBody(eastFull.body); }
-    annex.visible = on; annexDoor.show(on); soonSign.visible = !on; exitSign.visible = on;
+    // the storage room is open in both modes: sample jars in Story Mode, the starting chemicals in Normal Mode
+    eastFull.mesh.visible = false; for (const e of eastSplit) e.mesh.visible = true;
+    if (phys.world.bodies.includes(eastFull.body)) phys.world.removeBody(eastFull.body);
+    for (const e of eastSplit) if (!phys.world.bodies.includes(e.body)) phys.world.addBody(e.body);
+    annex.visible = true; annexDoor.show(true); soonSign.visible = !on; exitSign.visible = on;
     door.set(false); annexDoor.set(false);
   }
   updaters.push((dt) => { door.update(dt); annexDoor.update(dt); });
@@ -306,16 +307,7 @@ export function buildLab(G) {
   const lever = cyl(0.012, 0.012, 0.2, M.red, rs.x + 0.08, rs.y, rs.z, 8); lever.rotation.z = 1.2;
   mesh(new THREE.PlaneGeometry(0.5, 0.16), std({ map: T.signTex(['RESTOCK LAB'], '#ffc21a', '#111111', 512, 150, false), roughness: 0.6 }), X0 + 0.013, 1.62, 3.6, false).rotation.y = Math.PI / 2;
   fixtures.push({ pos: V(rs.x + 0.1, rs.y, rs.z), r: 0.22, name: 'Restock', hint: () => 'Restock: fresh supplies and clean glassware', use: () => { lever.rotation.z = lever.rotation.z > 0 ? -1.2 : 1.2; G.hooks.restock(); } });
-  // chemical supply terminal (Normal Mode): order any reagent the lab knows; it arrives on the cart
-  const term = V(X0 + 0.07, 1.35, 4.45);
-  deco(0.08, 0.5, 0.4, M.darkSteel, term.x, term.y, term.z);
-  mesh(new THREE.PlaneGeometry(0.34, 0.26), new THREE.MeshBasicMaterial({ map: T.signTex(['CHEMICAL', 'SUPPLY', '— F —'], '#062014', '#43ff8a', 256, 200, false) }), X0 + 0.115, term.y + 0.02, term.z, false).rotation.y = Math.PI / 2;
-  block(0.5, 0.05, 0.6, M.steel, X0 + 0.55, 0.7, 4.4);
-  for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) deco(0.03, 0.68, 0.03, M.darkSteel, X0 + 0.55 + a * 0.22, 0.34, 4.4 + b * 0.27);
-  G.deliverySpot = { x: X0 + 0.55, y: 0.725, z: 4.4 };
-  fixtures.push({ pos: V(term.x + 0.06, term.y, term.z), r: 0.25, name: 'Chemical supply', hint: () => (G.story ? 'Closed in Story Mode: everything has to be found' : 'Order chemicals (they arrive on the cart)'), use: () => { if (G.story) { G.hud.toast('Chemical supply', 'The supply line is closed in Story Mode. Find materials outside and make the rest.'); return; } G.hooks.openSupply && G.hooks.openSupply(); } });
-
-
+  // signs, extinguisher, clock
   mesh(new THREE.PlaneGeometry(0.7, 0.35), std({ map: T.signTex(['ADD ACID', 'TO WATER'], '#ffc21a', '#111111'), roughness: 0.6 }), 1.6, 2.35, Z0 + 0.014, false);
   mesh(new THREE.PlaneGeometry(0.7, 0.35), std({ map: T.signTex(['REACTIVE METALS:', 'TONGS ONLY'], '#c8201c', '#ffffff'), roughness: 0.6 }), X0 + 0.013, 2.45, -2.9, false).rotation.y = Math.PI / 2;
   const ext = cyl(0.07, 0.07, 0.42, M.red, 3.55, 1.0, Z0 + 0.1); void ext;
@@ -416,6 +408,19 @@ export function buildLab(G) {
     m.place(m.makeProp('crate'), 5.9, 0, 2.2, 0.2); m.place(m.makeProp('crate'), 5.9, 0.37, 2.2, -0.1); m.place(m.makeProp('crateS'), 5.3, 0, 2.0, 0.5);
     m.place(m.makeProp('crateS'), 0.2, 0, 2.6, 0.3);
     m.place(m.makeProp('gascyl'), 6.4, 0, 4.2); m.place(m.makeProp('barrel'), 5.5, 0, 4.2);
+    // the stockroom: the starting chemicals everything else is made from
+    STOCK.forEach((id, i) => {
+      const s = SUB[id], lvl = Math.floor(i / 11), k = i % 11;
+      if (lvl > 3) return;
+      const liquid = s.state === 'l' || s.acid || id === 'ammonium_hydroxide';
+      const watery = (s.acid && !/C/.test(s.formula || '')) || id === 'ammonium_hydroxide';
+      const it = m.makeVessel(liquid ? 'bottle' : 'jar', { label: s.name.replace(/\s*\(.*?\)/g, ''), formula: (s.display || s.formula || s.el || '') + (watery ? ' 1 M' : ''), tags: [...(s.tags || [])], accent: s.color });
+      if (watery) { m.fill(it, 'water', 26); m.fill(it, id, 0.5); }
+      else if (liquid) m.fill(it, id, Math.min(3, 150 * (s.density || 1) / s.M));
+      else { const mol = Math.min(1, 120 / s.M); if (s.look === 'metal') m.fill(it, id, mol, CHUNK, mol / 6); else m.fill(it, id, mol); }
+      m.place(it, SX1 - 0.24, [0.42, 0.95, 1.46, 1.98][lvl], 0.38 + k * 0.4, -Math.PI / 2);
+      it.info = s;
+    });
   }
 
   // Story Mode's big-burner upgrade burns hotter (a gas-air blowtorch rather than a Bunsen)

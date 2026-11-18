@@ -268,15 +268,3 @@ body.story .touch .stu { display: none !important; }
 .chips button:hover { border-color: var(--accent); }
 .ask-form { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); }
 .ask-form input { flex: 1; min-width: 0; font: 400 15px var(--body); color: var(--paper); background: #0c1114; border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; user-select: text; -webkit-user-select: text; }
-
-/* ---------- chemical supply ---------- */
-.supply-card { width: min(100%, 760px); }
-.supply-tools { padding: 10px 16px 0; display: flex; flex-direction: column; gap: 8px; }
-.supply-tools input { font: 400 15px var(--body); color: var(--paper); background: #0c1114; border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; user-select: text; -webkit-user-select: text; }
-.supply-tools .chips button.on { background: var(--accent); color: #14120a; border-color: transparent; }
-.supply-list { flex: 1; min-height: 0; overflow: auto; padding: 10px 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px; align-content: start; }
-.supply-item { display: flex; align-items: center; gap: 8px; text-align: left; padding: 8px 10px; background: #0e1417; border: 1px solid var(--line); border-radius: 7px; color: var(--paper); cursor: pointer; font: 500 13px/1.25 var(--body); }
-.supply-item:hover { border-color: var(--accent); }
-.supply-item i { width: 12px; height: 12px; border-radius: 3px; flex: none; border: 1px solid rgba(255,255,255,.25); }
-.supply-item small { display: block; font: 400 11px var(--mono); color: var(--mute); }
-.supply-foot { margin: 0; padding: 8px 16px 12px; font-size: 12px; color: var(--mute); border-top: 1px solid var(--line); }

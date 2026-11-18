@@ -82,3 +82,39 @@ export function stateAt(s, T) {
   if (s.mp === null || s.mp === undefined) return s.state;
   return 'l';
 }
+
+// ---------- recipes: the shortest chain of steps from the lab's starting chemicals to a substance ----------
+export const LAB_START = ['water', 'nahco3', 'acetic_acid', 'h2o2', 'yeast', 'sucrose', 'nacl', 'starch', 'oil', 'ethanol', 'hcl', 'naoh', 'citric', 'caco3', 'cuso4', 'alum', 'sodium', 'potassium', 'lithium', 'calcium', 'magnesium', 'iron', 'copper', 'carbon', 'aluminium', 'sulfur', 'phosphorus_red', 'mercury', 'silicon', 'gold', 'o2'];
+const START = new Set([...LAB_START, ...STOCK]);
+const via = new Map(); // substance -> { rx, depth }
+for (const id of START) via.set(id, { rx: null, depth: 0 });
+// prefer the classic routes when several are equally short
+const FAV = ['neutral', 'metal_acid', 'carbonate_acid', 'oxide_acid', 'precip', 'synth', 'smelt', 'halogen', 'ester', 'org_oxidise'];
+const pref = (r) => { const i = FAV.indexOf((r.discovery || '').replace('rx_gen_', '')); return r.gen ? (i < 0 ? 20 : i) : -1; };
+const ordered = [...RX].filter((r) => !r.phase).sort((a, b) => pref(a) - pref(b));
+for (let round = 1; round < 14; round++) {
+  let grew = false;
+  for (const r of ordered) {
+    const ins = r.inputs.filter((x) => x.from !== 'air').map((x) => x.id);
+    if (!ins.every((id) => via.has(id) && via.get(id).depth < round)) continue;
+    if (r.requires && !r.requires.every((x) => via.has(x.id))) continue;
+    if (r.catalysts && r.rate.k < 0.001 && !r.catalysts.some((c) => via.has(c.id))) continue;
+    for (const o of r.outputs) if (!via.has(o.id)) { via.set(o.id, { rx: r, depth: round }); grew = true; }
+  }
+  if (!grew) break;
+}
+export const isStarter = (id) => START.has(id);
+export const stepsTo = (id) => (via.has(id) ? via.get(id).depth : null);
+// the reactions to do, in order (each ingredient is made before it is used)
+export function recipe(id) {
+  if (!via.has(id) || START.has(id)) return via.has(id) ? [] : null;
+  const out = [], done = new Set();
+  (function walk(x) {
+    const v = via.get(x);
+    if (!v || !v.rx || done.has(v.rx.id)) return;
+    for (const i of v.rx.inputs) if (i.from !== 'air') walk(i.id);
+    if (v.rx.requires) for (const i of v.rx.requires) walk(i.id);
+    done.add(v.rx.id); out.push(v.rx);
+  })(id);
+  return out;
+}

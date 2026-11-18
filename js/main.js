@@ -4,7 +4,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { SUB, DISC, RXI, RX, canReact, equationOf } from './chem/db.js';
+import { SUB, DISC, RXI, RX, canReact, equationOf, STOCK } from './chem/db.js';
 import { ELEMENTS } from './chem/formula.js';
 import { Mixture } from './chem/mixture.js';
 import { createPhysics, G_STATIC, G_PROP } from './physics/world.js';
@@ -22,7 +22,6 @@ import { createHud, TOOLS } from './ui/hud.js';
 import { createStory, storyDefaults } from './story.js';
 import { createNet } from './net.js';
 import { createAsk } from './ui/ask.js';
-import { createSupply } from './ui/supply.js';
 
 const $ = (id) => document.getElementById(id);
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -36,7 +35,7 @@ let persistT = 0;
 const persist = () => { persistT = 1; };
 const persistNow = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* ignore */ } };
 
-const START_HAVE = ELEMENTS.filter((e) => e.start).map((e) => e.sym);
+const START_HAVE = [...new Set([...ELEMENTS.filter((e) => e.start).map((e) => e.sym), ...STOCK.map((id) => SUB[id].el || (SUB[id].formula && /^([A-Z][a-z]?)2?$/.exec(SUB[id].formula) || [])[1]).filter(Boolean)])];
 // G.prog is the active progress: the main save in Normal Mode, save.story in Story Mode
 const G = {
   THREE, Mixture, save, prog: save, settings: save.settings, persist, time: 0, sources: [], levels: { burner: 0 }, dist: distGain,
@@ -71,6 +70,7 @@ function boot() {
   const matter = createMatter(G); G.matter = matter;
   const gas = createGas(G); G.gas = gas;
   const lab = buildLab(G);
+  lab.setStory(false); // opens the storage room, where the starting chemicals are
   const sim = createSim(G);
   const story = createStory(G, { save, persist: () => persist(), hud, player, lab });
   let state = 'menu', uiOpen = false;
@@ -447,12 +447,9 @@ function boot() {
   function openPause() { uiOpen = true; input.st.enabled = false; hud.openPause(); }
   function openBook(tab) { uiOpen = true; input.st.enabled = false; input.unlock(); hud.openBook(tab); }
   const askUI = createAsk(() => { if (state === 'play') G.hooks.resume(); });
-  const supplyUI = createSupply(G, () => { if (state === 'play') G.hooks.resume(); });
-  G.hooks.openSupply = () => { if (net.guest) { hud.toast('Chemical supply', 'Only the host can order chemicals.'); return; } uiOpen = true; input.st.enabled = false; input.unlock(); supplyUI.open(); play('ui'); };
   function uiKeys() {
     if (state !== 'play') return;
     if (askUI.isOpen) { if (input.hit('Escape')) askUI.close(); return; }
-    if (supplyUI.isOpen) { if (input.hit('Escape')) supplyUI.close(); return; }
     if (input.hit('KeyT') && !hud.bookOpen && !hud.pauseOpen) { uiOpen = true; input.st.enabled = false; input.unlock(); askUI.open(); play('ui'); return; }
     if (input.hit('KeyH') && (G.story || G.settings.mode !== 'discovery') && !hud.bookOpen && !hud.pauseOpen) { hud.guide(); play('ui'); }
     if (input.hit('KeyZ') && !hud.bookOpen && !hud.pauseOpen) {
@@ -572,7 +569,7 @@ function boot() {
 
   // ---------- main loop ----------
   const dbg = { maxDt: 0.05, speed: 1, freeze: false };
-  window.__lab = { G, grab, matter, sim, gas, lab, player, input, dbg, findTarget, primary, story, startMode, askUI, supplyUI, get net() { return net; }, selectTool: (t) => { tool = t; refreshTool(); }, state: () => state };
+  window.__lab = { G, grab, matter, sim, gas, lab, player, input, dbg, findTarget, primary, story, startMode, askUI, get net() { return net; }, selectTool: (t) => { tool = t; refreshTool(); }, state: () => state };
   let last = performance.now(), slow = 0, frames = 0;
   // one step of the whole game, without drawing it (tests call this directly to run fast)
   function step(dt) {

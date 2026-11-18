@@ -208,7 +208,7 @@ function colourOf(p) {
   return '#f2f2ee';
 }
 // a short fact for compounds that have none
-function factOf(e, p, routes) {
+function factOf(e, p, routes, depth) {
   const ORIGIN = {
     'Alkanes and cycloalkanes': 'In real life it comes from crude oil or natural gas, separated by distillation at a refinery.',
     'Alkenes, alkynes and dienes': 'In real life it is made by cracking oil fractions at a refinery, or taken from plants.',
@@ -220,7 +220,7 @@ function factOf(e, p, routes) {
     'Sugars and carbohydrates': 'In real life plants make it by photosynthesis.',
     'Polymers and monomers': 'In real life it is made in chemical plants from oil-based chemicals.',
   };
-  const how = e.banned ? 'It is too dangerous to make in this game, so it is here for reference only.' : NO_ROUTES.has(e.cat) ? HOW_MADE[e.cat] : routes ? `There ${routes === 1 ? 'is 1 way' : 'are ' + routes + ' ways'} to make it in the lab.` : `It cannot be made in the lab yet: order it from the chemical supply terminal in Normal Mode. ${ORIGIN[e.cat] || 'In real life it is made in industrial chemical plants.'}`;
+  const how = e.banned ? 'It is too dangerous to make in this game, so it is here for reference only.' : NO_ROUTES.has(e.cat) ? HOW_MADE[e.cat] : stockIds.has(e.id) ? `It is one of the starting chemicals in the storage room (Normal Mode).` : routes && depth ? `There ${routes === 1 ? 'is 1 way' : 'are ' + routes + ' ways'} to make it. From the starting chemicals it takes ${depth} step${depth > 1 ? 's' : ''}.` : routes ? `There ${routes === 1 ? 'is a reaction' : 'are reactions'} that make it, but their ingredients cannot be made from the lab's starting chemicals yet. ${ORIGIN[e.cat] || ''}` : `It cannot be made in the lab yet. ${ORIGIN[e.cat] || 'In real life it is made in industrial chemical plants.'}`;
   const kind = p && p.ions ? `A ${p.ions.an.n === 'oxide' ? 'metal oxide' : 'salt'} of ${p.ions.cat.f === 'NH4' ? 'ammonium' : EL[p.ions.cat.metal].name.toLowerCase()} ${p.ions.cat.metal && ['Fe', 'Cu', 'Sn', 'Pb', 'Mn', 'Co', 'Ni', 'Cr'].includes(p.ions.cat.metal) ? '(' + ['', 'I', 'II', 'III'][p.ions.cat.z] + ')' : ''} and ${p.ions.an.n}${p.ions.w ? ` with ${p.ions.w} water molecule${p.ions.w > 1 ? 's' : ''} in each crystal unit` : ''}.`.replace(' )', ')').replace(/ \(/, '(').replace(/\s+/g, ' ').replace(' and', ' and') : '';
   return [kind, `Category: ${e.cat.toLowerCase()}.`, how].filter(Boolean).join(' ');
 }
@@ -336,7 +336,7 @@ for (const p of saltList) {
   if (metal && ['Br', 'I'].includes(an.f) && named(an.f === 'Br' ? 'bromine' : 'iodine') && ca.z === ({ Fe: 3, Cu: 2, Sn: 4 }[ca.metal] || ca.z) && REACT[ca.metal] >= 2)
     rx('Synthesis', 'synth', [metal, named(an.f === 'Br' ? 'bromine' : 'iodine')], [target], { target, water: an.f === 'I' && ca.metal === 'Al', dH: -200, cond: { minTemp: an.f === 'I' && ca.metal === 'Al' ? 20 : 60 }, rate: { k: 0.15 }, fx: [{ fx: 'smoke', amount: 0.6, color: an.f === 'I' ? '#8a3aa8' : '#a8501e' }] });
   // 8. metal + oxygen, heated: oxides
-  if (metal && an.f === 'O' && REACT[ca.metal] >= 1 && !['Na', 'K', 'Li', 'Mg', 'Al', 'Cu', 'Fe'].includes(ca.metal) && ca.z === ({ Fe: 3, Co: 2, Mn: 2, Cr: 3, Sn: 2, Pb: 2, Ni: 2 }[ca.metal] || ca.z))
+  if (metal && an.f === 'O' && REACT[ca.metal] >= 2 && !['Na', 'K', 'Li', 'Mg', 'Al', 'Cu', 'Fe'].includes(ca.metal) && ca.z === ({ Fe: 3, Co: 2, Mn: 2, Cr: 3, Sn: 2, Pb: 2, Ni: 2 }[ca.metal] || ca.z))
     rx('Oxidation', 'oxidise', [metal], [target], { target, air: true, dH: -250, cond: { minTemp: 400 }, rate: { k: 0.04 }, fx: [{ fx: 'smoke', amount: 0.15, color: '#cfcfc8' }] });
   // 9. displacement: a more reactive metal pushes a less reactive one out of solution
   if (metal && !insol && ['SO4', 'NO3', 'Cl'].includes(an.f) && ca.metal !== 'Na' && ca.metal !== 'K') {
@@ -535,10 +535,29 @@ for (const e of out) {
 }
 for (const [k, v] of Object.entries({ smelt: ['Smelting', 'Carbon pulls the oxygen out of a metal oxide, leaving the metal. Zinc, lead and tin have been made this way for thousands of years.'], halogen: ['Freeing a halogen', 'An oxidiser takes electrons from chloride, bromide or iodide ions and frees the element: green chlorine, red-brown bromine, violet iodine.'], chromate: ['Chromate and dichromate', 'Yellow chromate turns orange dichromate in acid, and back again in alkali: one of the prettiest equilibria in chemistry.'], alkoxide: ['Metals in alcohols', 'Reactive metals fizz in alcohols as they do in water, more gently, giving hydrogen and an alkoxide.'], carbide: ['Carbide and acetylene', 'Calcium carbide and water make acetylene, the gas that lit old miners\' lamps.'], double_salt: ['Double salts', 'Two salts crystallising together into one crystal, like Mohr\'s salt and alum.'], dehydrate_org: ['Dehydrating alcohols', 'Hot acid pulls water out of an alcohol, leaving a double bond: an alkene.'], hydrate_org: ['Hydrating alkenes', 'An alkene and water join over an acid catalyst to make an alcohol. Industrial ethanol is made this way.'], bromine_test: ['The bromine test', 'Orange bromine water goes colourless with an alkene, because bromine adds across the double bond.'], haloalkane: ['Haloalkanes', 'An alcohol\'s -OH group swaps for a halogen atom when it meets a hydrogen halide.'], amine: ['Making amines', 'Ammonia pushes the halogen off a haloalkane, giving an amine: an organic cousin of ammonia.'], amide: ['Making amides', 'Acids and ammonia join, losing water, to make amides like acetamide.'], ether: ['Making ethers', 'Two alcohol molecules lose one water between them to make an ether. Diethyl ether was the first surgical anaesthetic.'], weak_acid: ['Strong acid frees a weak acid', 'A strong acid hands its hydrogen to the salt of a weak acid, freeing the weak acid. This is how soap curdles in acid.'] })) discOut.push({ id: 'rx_gen_' + k, name: v[0], cat: 'Reactions', hint: 'One of the families of reactions that make the 1,700 compounds.', fact: v[1] });
 
+// ---------- the starting chemicals (Normal Mode stockroom) and what can be reached from them ----------
+// Only basics that cannot be made from anything simpler in the lab. Everything else has to be made, step by step.
+const LAB = ['water', 'nahco3', 'acetic_acid', 'h2o2', 'yeast', 'sucrose', 'nacl', 'starch', 'oil', 'ethanol', 'hcl', 'naoh', 'citric', 'caco3', 'cuso4', 'alum', 'sodium', 'potassium', 'lithium', 'calcium', 'magnesium', 'iron', 'copper', 'carbon', 'aluminium', 'sulfur', 'phosphorus_red', 'mercury', 'silicon', 'gold'];
+const stockIds = new Set(NEW_ELEMENTS.map((x) => x.id));
+for (const n of ['bromine', 'iodine', 'sulfuric acid', 'nitric acid', 'phosphoric acid', 'hydrobromic acid', 'hydroiodic acid', 'ammonium hydroxide', 'potassium hydroxide', 'potassium permanganate', 'potassium dichromate', 'sodium thiosulfate', 'sodium sulfite', 'sodium fluoride', 'potassium thiocyanate', 'methanol', '1-propanol', 'isopropanol', '1-butanol', 'benzyl alcohol', 'isoamyl alcohol', 'cyclohexanol', 'salicylic acid', 'lactic acid', 'acetic anhydride', 'ethylene glycol', 'styrene', 'methyl methacrylate', 'vinyl acetate', 'caprolactam', 'adipic acid', 'hexamethylenediamine', 'terephthalic acid', 'hexane']) { const id = named(n); if (id && !pool.get(id).banned) stockIds.add(id); }
+const stock = [...stockIds];
+const reachDepth = new Map([...LAB, ...stockIds, 'o2'].map((id) => [id, 0]));
+for (let round = 1; round < 12; round++) {
+  let grew = false;
+  for (const r of [...BASE_RX, ...RXS]) {
+    const ins = r.inputs.filter((x) => x.from !== 'air').map((x) => x.id);
+    if (!ins.every((id) => reachDepth.has(id) && reachDepth.get(id) < round)) continue;
+    if (r.requires && !r.requires.every((x) => reachDepth.has(x.id))) continue;
+    if (r.catalysts && r.rate.k < 0.001 && !r.catalysts.some((c) => reachDepth.has(c.id))) continue;
+    for (const o of r.outputs) if (!reachDepth.has(o.id)) { reachDepth.set(o.id, round); grew = true; }
+  }
+  if (!grew) break;
+}
+
 // ---------- substances ----------
 const GASES = new Set(['h2', 'o2', 'n2', 'f2', 'cl2', 'co', 'co2', 'no', 'no2', 'n2o', 'nh3', 'h2s', 'so2', 'so3x', 'ch4', 'c2h6', 'c3h8', 'c4h10', 'c2h4', 'c3h6', 'c2h2', 'hcl_g', 'he', 'ne', 'ar', 'kr', 'xe', 'rn']);
 const ACID_INFO = { 'sulfuric acid': { strong: true, h: 2 }, 'hydrochloric acid': { strong: true }, 'nitric acid': { strong: true }, 'hydrobromic acid': { strong: true }, 'hydroiodic acid': { strong: true }, 'perchloric acid': { strong: true }, 'chloric acid': { strong: true }, 'phosphoric acid': { pKa: 2.15 }, 'carbonic acid': { pKa: 6.35 }, 'sulfurous acid': { pKa: 1.8 }, 'nitrous acid': { pKa: 3.3 }, 'hypochlorous acid': { pKa: 7.5 }, 'boric acid': { pKa: 9.24 }, 'formic acid': { pKa: 3.75 }, 'oxalic acid': { pKa: 1.25 }, 'lactic acid': { pKa: 3.86 }, 'benzoic acid': { pKa: 4.2 }, 'salicylic acid': { pKa: 2.97 }, 'iodic acid': { pKa: 0.8 }, 'chlorous acid': { pKa: 1.96 }, 'silicic acid': { pKa: 9.8 } };
-const stock = [];
+
 const subsOut = [];
 for (const e of out) {
   const p = pool.get(e.id) || { name: e.name, c: e.c };
@@ -580,7 +599,7 @@ for (const e of out) {
   if (isOrg && state !== 's' && c && !c.F && !(c.Cl > 1)) tags.push('flammable');
   if (tags.length) s.tags = [...new Set(tags)];
   if (state === 'g' && tags.includes('toxic')) s.toxic = 0.004;
-  s.fact = factOf(e, p, madeBy.get(e.id) || 0);
+  s.fact = factOf(e, p, madeBy.get(e.id) || 0, reachDepth.get(e.id));
   if (e.banned) s.banned = true;
   if (NO_ROUTES.has(e.cat)) s.reference = true;
   for (const k in s) if (s[k] === undefined) delete s[k];
@@ -588,10 +607,7 @@ for (const e of out) {
 }
 // the starting reagents you can order in Normal Mode: elements, acids, alkalis, one soluble salt of each metal,
 // sodium or potassium salts of each anion, and basic organic chemicals
-const stockIds = new Set();
-for (const s of NEW_ELEMENTS) stockIds.add(s.id);
-for (const n of ['bromine', 'iodine', 'sulfuric acid', 'nitric acid', 'phosphoric acid', 'hydrobromic acid', 'hydroiodic acid', 'formic acid', 'ammonium hydroxide', 'potassium hydroxide', 'barium hydroxide', 'methanol', '1-propanol', 'isopropanol', '1-butanol', 'benzyl alcohol', 'isoamyl alcohol', 'glucose', 'fructose', 'glycerol', 'propanoic acid', 'butanoic acid', 'benzoic acid', 'salicylic acid', 'lactic acid', 'oxalic acid', 'cyclohexanol', 'styrene', 'methyl methacrylate', 'vinyl acetate', 'caprolactam', 'adipic acid', 'hexamethylenediamine', 'terephthalic acid', 'ethylene glycol', 'acetone', 'hexane', 'manganese dioxide', 'potassium permanganate', 'potassium dichromate', 'potassium chromate', 'sodium thiosulfate', 'sodium sulfite', 'sodium sulfide', 'potassium iodide', 'sodium bromide', 'sodium sulfate', 'sodium carbonate', 'sodium phosphate', 'trisodium phosphate', 'sodium nitrate', 'potassium nitrate', 'sodium nitrite', 'silver nitrate', 'lead(ii) nitrate', 'lead nitrate', 'barium chloride', 'zinc sulfate', 'zinc chloride', 'nickel(ii) sulfate', 'nickel sulfate', 'cobalt(ii) chloride', 'cobalt chloride', 'manganese(ii) sulfate', 'manganese sulfate', 'iron(iii) chloride', 'aluminium sulfate', 'aluminum sulfate', 'strontium nitrate', 'chromium(iii) chloride', 'ammonium chloride', 'ammonium sulfate', 'potassium bromide', 'sodium fluoride', 'potassium thiocyanate', 'sodium silicate', 'calcium chloride', 'magnesium sulfate', 'copper(ii) nitrate', 'tin(ii) chloride', 'sodium acetate', 'sodium hydrogen sulfate', 'sodium bisulfate', 'potassium carbonate', 'sodium hydrogen carbonate', 'sulfur trioxide', 'phosphorus pentoxide']) { const id = named(n); if (id && !pool.get(id).banned) stockIds.add(id); }
-for (const id of stockIds) stock.push(id);
+
 
 // discoveries for each family of generated reactions
 const FAMILY = {
@@ -627,6 +643,6 @@ writeFileSync(resolve(root, 'data/compounds.json'), '{"elements":' + JSON.string
 writeFileSync(resolve(root, 'data/reactions-gen.json'), '[\n' + RXS.map((r) => JSON.stringify(r)).join(',\n') + '\n]\n');
 writeFileSync(resolve(root, 'data/stock.json'), JSON.stringify({ reagents: stock, discoveries: discOut }, null, 0) + '\n');
 const makeable = subsOut.filter((s) => madeBy.get(s.id)).length;
-console.log(`entries ${entries.length}; already in game ${entries.length - out.length}; new substances ${subsOut.length}; reactions ${RXS.length}; makeable new substances ${makeable}; banned ${subsOut.filter((s) => s.banned).length}; reference-only ${subsOut.filter((s) => s.reference).length}; stock ${stock.length}`);
+console.log(`reachable from the starting chemicals: ${[...reachDepth.keys()].length} substances (new compounds: ${subsOut.filter((x) => reachDepth.has(x.id)).length}); entries ${entries.length}; already in game ${entries.length - out.length}; new substances ${subsOut.length}; reactions ${RXS.length}; makeable new substances ${makeable}; banned ${subsOut.filter((s) => s.banned).length}; reference-only ${subsOut.filter((s) => s.reference).length}; stock ${stock.length}`);
 const fam = {}; for (const r of RXS) fam[r.discovery] = (fam[r.discovery] || 0) + 1; console.log(fam);
 const multi = [...madeBy.values()].filter((n) => n >= 2).length; console.log('made 2+ ways:', multi);

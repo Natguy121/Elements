@@ -15,7 +15,7 @@ import { Particles, updateTweens } from './core/fx.js';
 import { initAudio, play, loopVol, setListener, setVolume, distGain } from './core/audio.js';
 import { particleTextures } from './world/textures.js';
 import { buildLab } from './world/lab.js';
-import { buildClassroom } from './world/classroom.js';
+import { buildClassroom, BOARD_DEFAULT } from './world/classroom.js';
 import { createMatter } from './matter/items.js';
 import { createGas } from './matter/gas.js';
 import { createSim } from './matter/sim.js';
@@ -460,7 +460,7 @@ function boot() {
   function uiKeys() {
     if (state !== 'play') return;
     if (askUI.isOpen) { if (input.hit('Escape')) askUI.close(); return; }
-    if (chatOpen) return;
+    if (chatOpen || boardOpen) return;
     if (net.role && input.hit('Enter') && !hud.bookOpen && !hud.pauseOpen) { openChat(); return; }
     if (net.role && input.hit('KeyV') && !hud.bookOpen && !hud.pauseOpen) { toggleMic(); }
     if (input.hit('KeyT') && !hud.bookOpen && !hud.pauseOpen) { uiOpen = true; input.st.enabled = false; input.unlock(); askUI.open(); play('ui'); return; }
@@ -545,6 +545,16 @@ function boot() {
     setTimeout(() => li.classList.add('old'), 12000);
     play('note', null, 0.3);
   }
+  // ---------- whiteboard ----------
+  let boardOpen = false;
+  G.hooks.openBoard = () => { boardOpen = true; uiOpen = true; input.st.enabled = false; input.unlock(); $('boardText').value = save.board ?? BOARD_DEFAULT; $('board').hidden = false; setTimeout(() => $('boardText').focus(), 20); play('ui'); };
+  function closeBoard() { boardOpen = false; $('board').hidden = true; $('boardText').blur(); G.hooks.resume(); }
+  function writeBoard(text) { save.board = text; persistNow(); G.classroom.setBoard(text); play('scoop'); closeBoard(); }
+  $('boardSave').onclick = () => writeBoard($('boardText').value);
+  $('boardClear').onclick = () => writeBoard('');
+  $('boardCancel').onclick = closeBoard;
+  $('boardText').onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Escape') closeBoard(); };
+  $('boardText').onkeyup = (e) => e.stopPropagation();
   function openChat() { chatOpen = true; uiOpen = true; input.st.enabled = false; input.unlock(); $('chatBox').classList.add('open'); $('chatInput').hidden = false; $('chatInput').value = ''; setTimeout(() => $('chatInput').focus(), 20); }
   function closeChat() { chatOpen = false; $('chatBox').classList.remove('open'); $('chatInput').hidden = true; $('chatInput').blur(); G.hooks.resume(); }
   $('chatInput').onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') { net.say($('chatInput').value); closeChat(); } else if (e.key === 'Escape') closeChat(); };

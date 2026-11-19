@@ -284,3 +284,5 @@ body.story .touch .stu { display: none !important; }
 .owner-row input { flex: 1; min-width: 0; font: 400 14px var(--body); color: var(--paper); background: #0c1114; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
 .touch .mp-only { display: none; }
 body.mp .touch .mp-only { display: block; }
+
+.board-card textarea { min-height: 220px; font: 500 16px/1.5 "Comic Sans MS","Segoe Print",var(--body); user-select: text; -webkit-user-select: text; }

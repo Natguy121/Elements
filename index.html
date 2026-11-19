@@ -74,7 +74,7 @@
 
   <section id="menu" class="screen menu">
     <div class="menu-inner">
-      <p class="eyebrow">First-person chemistry sandbox · version 17</p>
+      <p class="eyebrow">First-person chemistry sandbox · version 18</p>
       <h1 class="logo">Reaction<br>Lab</h1>
       <p class="tagline">Pick things up. Pour them together. Find out.</p>
       <div class="start">
@@ -170,6 +170,14 @@
     </div>
   </section>
 
+  <section id="board" class="modal" hidden>
+    <div class="card board-card" role="dialog" aria-labelledby="boardTitle">
+      <h2 id="boardTitle">Whiteboard</h2>
+      <p class="fine">Each line is written in the next marker colour (blue, red, green, black). Up to 9 lines.</p>
+      <textarea id="boardText" rows="9" maxlength="600" aria-label="Whiteboard text"></textarea>
+      <div class="card-actions"><button id="boardSave" class="btn primary" type="button">Write it</button><button id="boardClear" class="btn" type="button">Wipe board</button><button id="boardCancel" class="btn" type="button">Cancel</button></div>
+    </div>
+  </section>
   <section id="ask" class="modal ask-modal" hidden>
     <div class="ask-card" role="dialog" aria-labelledby="askTitle">
       <header class="ask-head"><div><h2 id="askTitle">Lab Assistant</h2><span id="askCount" class="count"></span></div><button id="askClose" class="btn small" type="button">Close</button></header>

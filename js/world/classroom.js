@@ -19,16 +19,23 @@ function plankFloor() {
   speckle(g, 1024, 1024, 8000, 0.05);
   return tex(c, 4, 4);
 }
-function whiteboard() {
-  const [c, g] = cv(1024, 384);
-  g.fillStyle = '#f6f8f8'; g.fillRect(0, 0, 1024, 384);
-  g.fillStyle = '#1f4fa8'; g.font = '700 46px "Comic Sans MS","Segoe Print",cursive'; g.fillText('Today: acids, bases and indicators', 40, 80);
-  g.fillStyle = '#c8301c'; g.font = '600 40px "Comic Sans MS","Segoe Print",cursive';
-  g.fillText('acid + alkali  ->  salt + water', 70, 170);
-  g.fillStyle = '#1e7a3a'; g.fillText('NaHCO3 + CH3COOH -> CH3COONa + H2O + CO2', 70, 240);
-  g.fillStyle = '#333'; g.font = '500 30px "Comic Sans MS","Segoe Print",cursive'; g.fillText('Goggles on. Tie hair back. Never point a test tube at anyone.', 70, 320);
-  return tex(c);
+export const BOARD_DEFAULT = 'Today: acids, bases and indicators\nacid + alkali -> salt + water\nNaHCO3 + CH3COOH -> CH3COONa + H2O + CO2\nGoggles on. Tie hair back. Never point a test tube at anyone.';
+const INKS = ['#1f4fa8', '#c8301c', '#1e7a3a', '#222222'];
+// the whiteboard is a canvas: whatever is written is drawn line by line in marker colours
+function drawBoard(c, text) {
+  const g = c.getContext('2d');
+  g.fillStyle = '#f6f8f8'; g.fillRect(0, 0, c.width, c.height);
+  const lines = String(text || '').split('\n').slice(0, 9);
+  const size = lines.length > 6 ? 30 : lines.length > 4 ? 36 : 44;
+  g.font = `600 ${size}px "Comic Sans MS","Segoe Print","Bradley Hand",cursive`;
+  lines.forEach((ln, i) => {
+    g.fillStyle = INKS[i % INKS.length];
+    let t = ln;
+    while (t && g.measureText(t).width > c.width - 70) t = t.slice(0, -1);
+    g.fillText(t, 36, 22 + (i + 1) * (size * 1.25));
+  });
 }
+function whiteboard(text) { const [c] = cv(1024, 384); drawBoard(c, text); const t = tex(c); t.userData = { canvas: c }; return t; }
 
 export function buildClassroom(G, lab) {
   const { scene, phys } = G;
@@ -73,7 +80,11 @@ export function buildClassroom(G, lab) {
     for (const dy of [-0.78, 0.78]) box(0.03, 0.06, 2.1, M.accent, x, 1.95 + dy, z, false);
   }
   // whiteboard and teacher's area at the front (south wall)
-  { const wb = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 2.0), std({ map: whiteboard(), roughness: 0.3 })); wb.position.set(0, 1.9, Z1 - 0.02); wb.rotation.y = Math.PI; root.add(wb); box(5.6, 0.06, 0.12, M.steel, 0, 0.86, Z1 - 0.06, false); }
+  const boardTex = whiteboard(G.save.board ?? BOARD_DEFAULT);
+  { const wb = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 2.0), std({ map: boardTex, roughness: 0.3 })); wb.position.set(0, 1.9, Z1 - 0.02); wb.rotation.y = Math.PI; root.add(wb); box(5.6, 0.06, 0.12, M.steel, 0, 0.86, Z1 - 0.06, false); }
+  // a marker tray with three pens
+  for (const [i, col] of [0x1f4fa8, 0xc8301c, 0x1e7a3a].entries()) { const pen = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.13, 8).rotateZ(Math.PI / 2), std({ color: col, roughness: 0.5 })); pen.position.set(-0.3 + i * 0.2, 0.9, Z1 - 0.07); root.add(pen); }
+  function setBoard(text) { drawBoard(boardTex.userData.canvas, text); boardTex.needsUpdate = true; }
   { const s = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.45), new THREE.MeshBasicMaterial({ map: signTex(['TEACHING LAB'], '#12302e', '#e8f4f2', 1024, 180, false) })); s.position.set(0, 3.2, Z1 - 0.02); s.rotation.y = Math.PI; root.add(s); }
   // sign over the door, on the main lab side
   const doorSign = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.2), new THREE.MeshBasicMaterial({ map: signTex(['TEACHING LAB  >'], '#06140c', '#43ff8a', 512, 128, false) }));
@@ -131,6 +142,7 @@ export function buildClassroom(G, lab) {
   box(1.6, 0.05, 0.8, M.wood, 5.4, 0.78, 17.4, false);
   for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) box(0.05, 0.76, 0.05, M.dark, 5.4 + a * 0.74, 0.38, 17.4 + b * 0.34, false);
   solid(5.4, 0.4, 17.4, 1.6, 0.8, 0.8);
+  fixtures.push({ pos: new THREE.Vector3(0, 1.4, Z1 - 0.1), r: 1.3, name: 'Whiteboard', off: () => G.story, hint: () => 'Write on the whiteboard', use: () => G.hooks.openBoard && G.hooks.openBoard() });
   // put the fixtures into the game's list (after the lab's, before Story Mode's)
   for (const f of fixtures) G.fixtures.push(f);
 
@@ -161,5 +173,5 @@ export function buildClassroom(G, lab) {
     }
   }
   const inside = (p) => shown && p.x > X0 && p.x < X1 && p.z > Z0 && p.z < Z1;
-  return { show, update, populate, inside, seats: seats.length };
+  return { show, update, populate, inside, setBoard, seats: seats.length };
 }

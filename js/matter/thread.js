@@ -24,6 +24,7 @@ export function createThreads(G) {
     play('clink', it.body.position, 0.3);
   }
   function detach(it) {
+    if (it.inRack) { releaseTube(it); return; }
     if (!it.hang) return;
     if (it.hang.funnel === it) it.hang.funnel = null;
     it.hang = null;
@@ -63,7 +64,41 @@ export function createThreads(G) {
     }
     cl.scale.setScalar(Math.max(0.0015, size));
   }
+  // test tubes stand in the slots of a rack, and go wherever the rack goes
+  const q = new THREE.Quaternion(), lp = new THREE.Vector3();
+  function slotPos(rack, i, out) { return out.set(-0.125 + i * 0.05, -0.015 + 0.004, 0).applyQuaternion(q.set(rack.body.quaternion.x, rack.body.quaternion.y, rack.body.quaternion.z, rack.body.quaternion.w)).add(lp.set(rack.body.position.x, rack.body.position.y, rack.body.position.z)); }
+  const sp = new THREE.Vector3();
+  function tubes(dt) {
+    for (const t of G.matter.items) {
+      if (t.type !== 'testtube' || t.dead) continue;
+      if (t.inRack) {
+        const r = t.inRack;
+        if (r.dead || t.held) { releaseTube(t); continue; }
+        slotPos(r, t.slot, sp);
+        t.body.position.set(sp.x, sp.y + t.halfH, sp.z);
+        t.body.quaternion.set(r.body.quaternion.x, r.body.quaternion.y, r.body.quaternion.z, r.body.quaternion.w);
+        t.body.velocity.set(0, 0, 0); t.body.angularVelocity.set(0, 0, 0);
+        G.matter.sync(t);
+        continue;
+      }
+      if (t.held || t.body.velocity.length() > 1) continue;
+      for (const r of G.matter.items) {
+        if (r.type !== 'rack' || r.dead) continue;
+        if (Math.hypot(t.body.position.x - r.body.position.x, t.body.position.z - r.body.position.z) > 0.25) continue;
+        const used = new Set([...G.matter.items].filter((x) => x.inRack === r).map((x) => x.slot));
+        let best = -1, bd = 0.035;
+        for (let i = 0; i < 6; i++) { if (used.has(i)) continue; slotPos(r, i, sp); const dd = Math.hypot(t.body.position.x - sp.x, t.body.position.z - sp.z); if (dd < bd && t.body.position.y - t.halfH > sp.y - 0.03 && t.body.position.y - t.halfH < sp.y + 0.16) { bd = dd; best = i; } }
+        if (best >= 0) { t.inRack = r; t.slot = best; t.hang = r; G.phys.world.removeBody(t.body); play('clink', t.body.position, 0.35); break; }
+      }
+    }
+  }
+  function releaseTube(t) {
+    t.inRack = null; t.hang = null;
+    if (!G.phys.world.bodies.includes(t.body)) G.phys.world.addBody(t.body);
+    t.body.wakeUp();
+  }
   function update(dt) {
+    tubes(dt);
     for (const it of G.matter.items) {
       if ((it.type !== 'thread' && it.type !== 'funnel' && it.type !== 'filterfunnel') || it.dead) continue;
       if (it.hang) {

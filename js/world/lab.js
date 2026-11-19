@@ -368,6 +368,12 @@ export function buildLab(G) {
     supplyJar('jar', 'alum', 0.6, 2.13, A, NB, { formula: 'KAl(SO4)2·12H2O' });
     supplyJar('bottle', 'cabbage', 0.06, 2.45, A, NB, { extra: [['water', 15]], formula: 'natural indicator', accent: '#5a3fa0' });
     supplyJar('dropper', 'phph', 0.06, 2.72, A, NB, { formula: 'pH 8.2-10' });
+    // test tubes in racks
+    for (const [rx, rz] of [[-1.0, -0.55], [1.4, 0.55]]) {
+      const rack = m.place(m.makeProp('rack'), rx, A, rz);
+      for (let i = 0; i < 6; i++) m.place(m.makeVessel('testtube'), rx - 0.125 + i * 0.05, A + 0.01, rz);
+      void rack;
+    }
     // funnels
     m.place(m.makeProp('funnel'), -1.2, A, 0.3); m.place(m.makeProp('filterfunnel'), -0.95, A, 0.3); m.place(m.makeProp('filterfunnel'), -0.7, A, 0.3);
     // crystal threads by the crystal-growing salts
@@ -464,6 +470,7 @@ export function buildLab(G) {
     G.stocked = new Set();
     glassware(m);
     m.place(m.makeProp('lighter'), -2.9, BENCH + 0.1, NZ0 + 0.5);
+    { const rk = m.place(m.makeProp('rack'), -1.0, BENCH, -0.55); void rk; for (let i = 0; i < 6; i++) m.place(m.makeVessel('testtube'), -1.125 + i * 0.05, BENCH + 0.01, -0.55); }
     m.place(m.makeProp('funnel'), -1.2, BENCH, 0.3); m.place(m.makeProp('filterfunnel'), -0.95, BENCH, 0.3);
     m.place(m.makeProp('thread'), 2.5, BENCH, 0.1); m.place(m.makeProp('thread'), 2.8, BENCH, 0.1);
     for (let i = 0; i < 6; i++) m.place(m.makeVessel('jar'), storeX + 0.02, 0.95, -3.2 + i * 0.4);

@@ -217,7 +217,13 @@ export function createMatter(G) {
     let shape, halfH;
     if (d.shape === 'box') {
       const [w, h, dd] = d.size;
-      if (d.look === 'funnel') {
+      if (d.look === 'rack') {
+        const wood = new THREE.MeshStandardMaterial({ color: 0x9a6a3a, roughness: 0.7 });
+        const base = new THREE.Mesh(new THREE.BoxGeometry(w, h, dd), wood); group.add(base);
+        const top = new THREE.Mesh(new THREE.BoxGeometry(w, 0.012, dd), wood); top.position.y = 0.07; group.add(top);
+        for (const sx of [-1, 1]) { const end = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.085, dd), wood); end.position.set(sx * (w / 2 - 0.006), 0.035, 0); group.add(end); }
+        for (let i = 0; i < 6; i++) { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.011, 0.002, 6, 16).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.8 })); ring.position.set(-0.125 + i * 0.05, 0.077, 0); group.add(ring); }
+      } else if (d.look === 'funnel') {
         const prof = [[0.004, -0.055], [0.004, -0.005], [0.048, 0.05], [0.05, 0.055]].map(([r, y]) => new THREE.Vector2(r, y));
         const cone = new THREE.Mesh(new THREE.LatheGeometry(prof, 24), M.glass); cone.renderOrder = 3; group.add(cone);
         if (d.filter) { const paper = new THREE.Mesh(new THREE.ConeGeometry(0.042, 0.05, 20, 1, true).rotateX(Math.PI), new THREE.MeshStandardMaterial({ color: 0xf6f4ee, roughness: 1, side: THREE.DoubleSide })); paper.position.y = 0.024; group.add(paper); }

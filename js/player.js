@@ -83,7 +83,8 @@ export function createPlayer(phys, camera, settings) {
     }
     const targetLean = (k.has('KeyQ') ? 1 : 0) - (k.has('KeyE') && !input.inspectHeld ? 0 : 0);
     p.lean += ((p.leanInput || 0) - p.lean) * Math.min(1, dt * 9);
-    p.eye += ((p.crouch ? EYE_CROUCH : EYE) - p.eye) * Math.min(1, dt * 10);
+    // seated on a stool your eyes are about 1.4 m up: higher than crouching, lower than standing
+    p.eye += ((p.sit ? EYE_CROUCH + 0.4 : p.crouch ? EYE_CROUCH : EYE) - p.eye) * Math.min(1, dt * 10);
     p.sag += (p.strain * 0.07 - p.sag) * Math.min(1, dt * 5);
     p.trauma = Math.max(0, p.trauma - dt * 0.9);
     p.blur = Math.max(0, p.blur - dt * 0.25);

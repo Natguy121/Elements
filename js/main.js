@@ -73,7 +73,7 @@ function boot() {
   const matter = createMatter(G); G.matter = matter;
   const gas = createGas(G); G.gas = gas;
   const lab = buildLab(G);
-  G.carts = buildCarts(G, scene, [[5.6, 7.2, 0], [-5.6, 7.2, 0]]);
+  G.carts = buildCarts(G, scene, [[5.6, 7.2, 0], [-6.5, 12.9, 0]]);
   G.classroom = buildClassroom(G, lab); // Normal Mode's teaching lab, through the south door
   lab.setStory(false); // opens the storage room, where the starting chemicals are
   const sim = createSim(G);

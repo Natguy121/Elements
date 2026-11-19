@@ -53,7 +53,7 @@ export function buildLab(G) {
   phys.staticBox(0, H + 0.5, 0, 16, 1, 12);
   [[0, Z0 - 0.15, 14.6, 0.3], [X0 - 0.15, 0, 0.3, 10.6]].forEach(([x, z, w, d]) => block(w, H, d, M.wall, x, H / 2, z));
   // south wall, with the doorway out (Story Mode) at x = -5.4
-  block(1.4, H, 0.3, M.wall, -6.6, H / 2, Z1 + 0.15); block(12.2, H, 0.3, M.wall, 1.2, H / 2, Z1 + 0.15); block(1.0, H - 2.1, 0.3, M.wall, -5.4, 2.1 + (H - 2.1) / 2, Z1 + 0.15);
+  block(1.0, H, 0.3, M.wall, -6.8, H / 2, Z1 + 0.15); block(11.8, H, 0.3, M.wall, 1.4, H / 2, Z1 + 0.15); block(1.8, H - 2.45, 0.3, M.wall, -5.4, 2.45 + (H - 2.45) / 2, Z1 + 0.15); // a wide doorway (1.8 m x 2.45 m) so nobody snags on it
   // east wall: whole in Normal Mode; in Story Mode it has a door to the storage room at z = 1.6
   const eastFull = { mesh: deco(0.3, H, 10.6, M.wall, X1 + 0.15, H / 2, 0), body: solidBox(phys, X1 + 0.15, H / 2, 0, 0.3, H, 10.6) };
   const eastSplit = [[-2.1, 6.4, H / 2, H], [3.7, 3.2, H / 2, H], [1.6, 1.0, 2.1 + (H - 2.1) / 2, H - 2.1]].map(([z, d, y, h]) => ({ mesh: deco(0.3, h, d, M.wall, X1 + 0.15, y, z), body: solidBox(phys, X1 + 0.15, y, z, 0.3, h, d, 0, false) }));
@@ -270,11 +270,11 @@ export function buildLab(G) {
   mesh(new THREE.PlaneGeometry(0.34, 0.34), std({ map: T.signTex(['+'], '#1f8a4c', '#ffffff', 256, 256, false), roughness: 0.5 }), 4.2, 1.45, Z1 - 0.165, false).rotation.y = Math.PI;
   G.firstAid = V(4.2, 1.2, Z1 - 0.5);
   // the door out: locked in Normal Mode, the way to the forest in Story Mode
-  deco(0.06, 2.16, 0.32, M.darkSteel, -5.93, 1.08, Z1 + 0.15); deco(0.06, 2.16, 0.32, M.darkSteel, -4.87, 1.08, Z1 + 0.15); deco(1.12, 0.06, 0.32, M.darkSteel, -5.4, 2.13, Z1 + 0.15);
-  const door = makeDoor(G, { x: -5.9, z: Z1 + 0.15, a0: 0, a1: -Math.PI / 2 * 0.92, mat: std({ color: 0x66757c, roughness: 0.45 }), window: true, name: 'Lab door', canUse: () => true }); // Story Mode: the forest. Normal Mode: the teaching lab
+  deco(0.06, 2.48, 0.32, M.darkSteel, -6.33, 1.24, Z1 + 0.15); deco(0.06, 2.48, 0.32, M.darkSteel, -4.47, 1.24, Z1 + 0.15); deco(1.92, 0.06, 0.32, M.darkSteel, -5.4, 2.47, Z1 + 0.15);
+  const door = makeDoor(G, { x: -6.3, z: Z1 + 0.15, w: 1.8, h: 2.45, a0: 0, a1: -Math.PI / 2 * 0.92, mat: std({ color: 0x66757c, roughness: 0.45 }), window: true, name: 'Lab door', canUse: () => true }); // Story Mode: the forest. Normal Mode: the teaching lab
   fixtures.push(door.fixture);
-  const soonSign = mesh(new THREE.PlaneGeometry(0.8, 0.2), new THREE.MeshBasicMaterial({ map: T.signTex(['MORE ROOMS SOON'], '#06140c', '#43ff8a', 512, 128, false) }), -5.4, 2.33, Z1 - 0.04, false); soonSign.rotation.y = Math.PI;
-  const exitSign = mesh(new THREE.PlaneGeometry(0.8, 0.2), new THREE.MeshBasicMaterial({ map: T.signTex(['WAY OUT  >'], '#06140c', '#43ff8a', 512, 128, false) }), -5.4, 2.33, Z1 - 0.04, false); exitSign.rotation.y = Math.PI; exitSign.visible = false;
+  const soonSign = mesh(new THREE.PlaneGeometry(0.8, 0.2), new THREE.MeshBasicMaterial({ map: T.signTex(['MORE ROOMS SOON'], '#06140c', '#43ff8a', 512, 128, false) }), -5.4, 2.7, Z1 - 0.04, false); soonSign.rotation.y = Math.PI;
+  const exitSign = mesh(new THREE.PlaneGeometry(0.8, 0.2), new THREE.MeshBasicMaterial({ map: T.signTex(['WAY OUT  >'], '#06140c', '#43ff8a', 512, 128, false) }), -5.4, 2.7, Z1 - 0.04, false); exitSign.rotation.y = Math.PI; exitSign.visible = false;
 
   // ---------- storage room (Story Mode): behind the east wall ----------
   const SX0 = X1 + 0.3, SX1 = 11.0, SZ0 = 0, SZ1 = 5.0;

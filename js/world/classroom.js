@@ -88,7 +88,7 @@ export function buildClassroom(G, lab) {
   { const s = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.45), new THREE.MeshBasicMaterial({ map: signTex(['TEACHING LAB'], '#12302e', '#e8f4f2', 1024, 180, false) })); s.position.set(0, 3.2, Z1 - 0.02); s.rotation.y = Math.PI; root.add(s); }
   // sign over the door, on the main lab side
   const doorSign = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.2), new THREE.MeshBasicMaterial({ map: signTex(['TEACHING LAB  >'], '#06140c', '#43ff8a', 512, 128, false) }));
-  doorSign.position.set(-5.4, 2.33, Z0 - 0.34); doorSign.rotation.y = Math.PI; root.add(doorSign);
+  doorSign.position.set(-5.4, 2.7, Z0 - 0.34); doorSign.rotation.y = Math.PI; root.add(doorSign);
   // ceiling lights
   for (let x = -4.5; x <= 4.5; x += 3) for (let z = Z0 + 2.5; z < Z1; z += 4) {
     const p = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.04, 0.3), std({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 1.6 })); p.position.set(x, H - 0.03, z); root.add(p);

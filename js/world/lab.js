@@ -271,7 +271,7 @@ export function buildLab(G) {
   G.firstAid = V(4.2, 1.2, Z1 - 0.5);
   // the door out: locked in Normal Mode, the way to the forest in Story Mode
   deco(0.06, 2.16, 0.32, M.darkSteel, -5.93, 1.08, Z1 + 0.15); deco(0.06, 2.16, 0.32, M.darkSteel, -4.87, 1.08, Z1 + 0.15); deco(1.12, 0.06, 0.32, M.darkSteel, -5.4, 2.13, Z1 + 0.15);
-  const door = makeDoor(G, { x: -5.9, z: Z1 + 0.15, a0: 0, a1: -Math.PI / 2 * 0.92, mat: std({ color: 0x66757c, roughness: 0.45 }), window: true, name: 'Lab door', canUse: () => (G.story ? true : 'Locked. Outside is Story Mode.') });
+  const door = makeDoor(G, { x: -5.9, z: Z1 + 0.15, a0: 0, a1: -Math.PI / 2 * 0.92, mat: std({ color: 0x66757c, roughness: 0.45 }), window: true, name: 'Lab door', canUse: () => true }); // Story Mode: the forest. Normal Mode: the teaching lab
   fixtures.push(door.fixture);
   const soonSign = mesh(new THREE.PlaneGeometry(0.8, 0.2), new THREE.MeshBasicMaterial({ map: T.signTex(['MORE ROOMS SOON'], '#06140c', '#43ff8a', 512, 128, false) }), -5.4, 2.33, Z1 - 0.04, false); soonSign.rotation.y = Math.PI;
   const exitSign = mesh(new THREE.PlaneGeometry(0.8, 0.2), new THREE.MeshBasicMaterial({ map: T.signTex(['WAY OUT  >'], '#06140c', '#43ff8a', 512, 128, false) }), -5.4, 2.33, Z1 - 0.04, false); exitSign.rotation.y = Math.PI; exitSign.visible = false;
@@ -298,7 +298,8 @@ export function buildLab(G) {
     eastFull.mesh.visible = false; for (const e of eastSplit) e.mesh.visible = true;
     if (phys.world.bodies.includes(eastFull.body)) phys.world.removeBody(eastFull.body);
     for (const e of eastSplit) if (!phys.world.bodies.includes(e.body)) phys.world.addBody(e.body);
-    annex.visible = true; annexDoor.show(true); soonSign.visible = !on; exitSign.visible = on;
+    annex.visible = true; annexDoor.show(true); soonSign.visible = false; exitSign.visible = on;
+    if (G.classroom) G.classroom.show(!on);
     rawSign.visible = !on; sampleSign.visible = on; catSign.visible = !on;
     door.set(false); annexDoor.set(false);
   }
@@ -425,6 +426,7 @@ export function buildLab(G) {
     m.place(m.makeProp('crate'), 5.9, 0, 2.2, 0.2); m.place(m.makeProp('crate'), 5.9, 0.37, 2.2, -0.1); m.place(m.makeProp('crateS'), 5.3, 0, 2.0, 0.5);
     m.place(m.makeProp('crateS'), 0.2, 0, 2.6, 0.3);
     m.place(m.makeProp('gascyl'), 6.4, 0, 4.2); m.place(m.makeProp('barrel'), 5.5, 0, 4.2);
+    if (G.classroom) G.classroom.populate(m);
     // the catalyst table: everything that speeds a reaction up without being used up
     CATALYSTS.forEach((id, i) => {
       const s = SUB[id]; if (!s) return;

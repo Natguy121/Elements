@@ -188,6 +188,8 @@ Every reaction in the Discovery Book shows its type (neutralisation, displacemen
 
 **Discovery Book.** First-time reactions, new substances and observations (layers, dissolving, saturation, boiling, melting, red heat, iron floating on mercury...) trigger a banner with a real fact. The book lists every entry, with hints for those not found. It also has an interactive periodic table of all 118 elements with real data. The notebook logs each experiment with amounts and starting temperature.
 
+**The teaching lab (Normal Mode).** Through the door in the south wall of the main lab is a big classroom lab, 14 × 14 m. It has a wooden floor, teal benches and big windows, with a whiteboard and a teacher's demonstration bench at the front. There are six student benches with two working Bunsen burners and four stools each, two stools at the teacher's bench (26 seats in all), and an empty table. Press F on a stool to sit; walk or jump to stand up. In Story Mode that door leads to the forest instead.
+
 **The lab.** One room:
 - benches, a sink with running water and a drain
 - two Bunsen burners, a hot plate and a precision balance

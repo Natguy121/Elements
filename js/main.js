@@ -15,6 +15,7 @@ import { Particles, updateTweens } from './core/fx.js';
 import { initAudio, play, loopVol, setListener, setVolume, distGain } from './core/audio.js';
 import { particleTextures } from './world/textures.js';
 import { buildLab } from './world/lab.js';
+import { buildClassroom } from './world/classroom.js';
 import { createMatter } from './matter/items.js';
 import { createGas } from './matter/gas.js';
 import { createSim } from './matter/sim.js';
@@ -71,6 +72,7 @@ function boot() {
   const matter = createMatter(G); G.matter = matter;
   const gas = createGas(G); G.gas = gas;
   const lab = buildLab(G);
+  G.classroom = buildClassroom(G, lab); // Normal Mode's teaching lab, through the south door
   lab.setStory(false); // opens the storage room, where the starting chemicals are
   const sim = createSim(G);
   const threads = createThreads(G);
@@ -633,6 +635,7 @@ function boot() {
     threads.update(dt);
     gas.update(dt, G.time);
     lab.update(dt, G.time);
+    G.classroom.update(dt, G.time);
     story.update(dt);
     net.update(dt);
     updateTweens(dt);

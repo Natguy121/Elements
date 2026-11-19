@@ -51,6 +51,11 @@ export function createPlayer(phys, camera, settings) {
 
     p.crouch = !p.dead && k.has('KeyC'); // not Ctrl: Ctrl+W closes the browser tab
     const moving = len > 0.1;
+    // sitting on a stool: stay put, eyes lower, until you walk or jump
+    if (p.sit) {
+      if (moving || k.has('Space')) p.sit = null;
+      else { p.crouch = true; body.position.x += (p.sit.x - body.position.x) * Math.min(1, dt * 12); body.position.z += (p.sit.z - body.position.z) * Math.min(1, dt * 12); body.velocity.x = 0; body.velocity.z = 0; }
+    }
     const sprint = !p.crouch && moving && f > 0 && k.has('ShiftLeft') && p.stamina > 0.05;
     const load = p.god ? 1 : 1 / (1 + p.carryMass / 22);
     let speed = (p.crouch ? 1.5 : sprint ? 5.0 : 3.0) * (0.35 + 0.65 * load) * (p.health < 35 ? 0.75 : 1) * (p.slow ?? 1);

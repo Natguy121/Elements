@@ -43,7 +43,7 @@ export function createGas(G) {
   const frac = (p, id) => (p.n[id] || 0) / Math.max(p.tot, (4 / 3) * Math.PI * p.r * p.r * p.r * AIR_MOL_M3);
 
   function update(dt, t) {
-    const B = G.bounds;
+    const B0 = G.bounds, CLASS = { x0: -7, x1: 7, z0: 5.3, z1: 19.3, y1: 3.6 };
     for (let i = puffs.length - 1; i >= 0; i--) {
       const p = puffs[i];
       p.age += dt;
@@ -64,11 +64,15 @@ export function createGas(G) {
       p.r += dt * 0.05 / (1 + p.age * 0.12);
       p.T += (20 - p.T) * Math.min(1, dt * 0.7);
       // indoors the ceiling and walls hold it in; outdoors (Story Mode) it is free to drift off
+      // the teaching lab (Normal Mode) is its own room; a cloud near the open door may drift between the two
+      const inClass = !G.story && p.z > B0.z1 + 0.1;
+      const B = inClass ? CLASS : B0;
       const indoors = !G.story || (p.x > B.x0 - 0.2 && p.x < B.x1 + 0.2 && p.z > B.z0 - 0.2 && p.z < B.z1 + 0.2);
       const floorY = indoors ? 0 : G.groundAt ? G.groundAt(p.x, p.z) : 0;
       if (indoors && p.y > B.y1 - p.r * 0.5) { p.y = B.y1 - p.r * 0.5; p.vy = 0; p.r += dt * 0.04; }
       if (p.y < floorY + p.r * 0.35) { p.y = floorY + p.r * 0.35; p.vy = 0; p.r += dt * 0.03; }
-      if (indoors && !(G.story && p.z > B.z1 - 1.2 && p.x < B.x0 + 2.4)) { p.x = Math.max(B.x0 + 0.1, Math.min(B.x1 - 0.1, p.x)); p.z = Math.max(B.z0 + 0.1, Math.min(B.z1 - 0.1, p.z)); }
+      const nearDoor = p.x < B0.x0 + 2.4 && Math.abs(p.z - B0.z1) < 1.2;
+      if (indoors && !nearDoor) { p.x = Math.max(B.x0 + 0.1, Math.min(B.x1 - 0.1, p.x)); p.z = Math.max(B.z0 + 0.1, Math.min(B.z1 - 0.1, p.z)); }
       if (p.age > 50 || (p.age > 5 && worst < 0.002 && vis < 0.02) || p.r > 2.2) { kill(i); continue; }
       if (p.sprite) {
         const s = p.sprite; s.position.set(p.x, p.y, p.z); s.scale.setScalar(p.r * 2.6);

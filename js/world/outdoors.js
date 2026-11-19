@@ -412,8 +412,8 @@ export function buildOutdoors(G) {
   // ---------- the lab from outside: a roof and a sign over the door ----------
   {
     const roof = std({ color: 0x4a4f53, roughness: 0.8 });
-    box(14.9, 0.3, 10.9, roof, 0, 3.55, 0, false);
-    box(4.5, 0.3, 5.9, roof, 9.35, 3.55, 2.5, false);
+    box(14.9, 0.3, 10.9, roof, 0, 3.62, 0, false); // underside clear of the lab ceiling (3.4 m), or the two flicker
+    box(4.5, 0.3, 5.9, roof, 9.35, 3.62, 2.5, false);
     const s = add(new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.5), std({ map: signTex(['SCIENCE LAB'], '#12202b', '#e8ecec', 768, 160, false), roughness: 0.6 })), -5.4, 2.75, 5.31, false); void s;
   }
 

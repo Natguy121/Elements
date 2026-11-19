@@ -28,7 +28,7 @@ export function createAsk(onClose) {
   function open() {
     if (!A) {
       A = createAssistant();
-      $('askCount').textContent = A.count.toLocaleString() + ' questions stored · offline · version 13';
+      $('askCount').textContent = A.count.toLocaleString() + ' questions stored · offline · version 14';
       say('bot', 'Hi, I am the Lab Assistant. I work offline and know this game\'s chemistry: ask what two things make, how to make something, where to find a material, or how to use a tool.', chips(A.suggestions));
     }
     $('ask').hidden = false;

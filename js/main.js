@@ -319,6 +319,7 @@ function boot() {
     const it = tg.best && tg.best.item, holder = it && it.kind === 'vessel' ? it : tg.puddle;
     const ahead = () => player.pos.clone().addScaledVector(player.dir, 0.55);
     if (grab.item && grab.item.tool === 'lighter') { if (first) play('spark', grab.item.body.position); lighterOn = true; return; }
+    if (tool === 'pick' && grab.item && grab.item.kind === 'lump') { if (first) { view.swing(); story.pick(tg, grab.item); } return; }
     if (grab.item && grab.item.def && grab.item.def.look === 'funnel') { if (first && !threads.scrape(grab.item, holder, ahead(), player.dir)) hud.toast('Funnel', grab.item.def.filter ? 'Nothing on the filter paper yet.' : 'Set it on top of a container, then pour into it.'); return; }
     if (grab.hold) return;
     if ((tool === 'spatula' || tool === 'trowel') && first && !toolLoad.isEmpty()) {
@@ -415,11 +416,11 @@ function boot() {
     const student = G.settings.mode !== 'discovery';
     const showTemp = tool === 'thermo' || student;
     hud.setStudent(student);
-    if (held) {
+    if (held && grab.hold && !held.dead) {
       hud.setCross('hold');
       hud.setTarget(held.name, hud.fmtG(held.body.mass * 1000) + (grab.hold.strain > 0.8 ? ' · straining' : ''));
       const p = [['LMB', 'let go']];
-      if (held.kind === 'vessel') p.push(['RMB', 'pour']); else if (held.tool === 'lighter') p.push(['RMB', 'flame']); else if (held.def && held.def.filter && held.cmix && !held.cmix.isEmpty()) p.push(['RMB', 'scrape out the solid']); else if (held.def && held.def.look === 'funnel') p.push(['Drop', 'on a container']);
+      if (tool === 'pick' && held.kind === 'lump') p.push(['RMB', 'crush it']); else if (held.kind === 'vessel') p.push(['RMB', 'pour']); else if (held.tool === 'lighter') p.push(['RMB', 'flame']); else if (held.def && held.def.filter && held.cmix && !held.cmix.isEmpty()) p.push(['RMB', 'scrape out the solid']); else if (held.def && held.def.look === 'funnel') p.push(['Drop', 'on a container']);
       if (held.kind === 'vessel' && (tg.story && tg.story.water || tg.fixture && tg.fixture.name === 'Kitchen tap')) p.push(['F', 'fill with water']);
       p.push(['X', 'set down'], ['Wheel', 'push/pull'], ['R', 'rotate']);
       if (student && held.mix && tg.best && tg.best.item.mix && tg.best.item !== held) { const r = reactsWith(held.mix, tg.best.item.mix); if (r) p.push(['Tip', 'these react: ' + r]); }

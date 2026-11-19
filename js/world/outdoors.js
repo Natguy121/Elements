@@ -470,7 +470,8 @@ export function buildOutdoors(G) {
   // ---------- story pickups ----------
   const spawners = SPAWNS.map((s) => ({ ...s, items: new Set(), t: 0 }));
   function spawnOne(sp) {
-    const M = G.matter, a = Math.random() * 6.28, r = Math.random() * sp.r;
+    // berries fall beside their bushes (not hidden inside them); everything else anywhere in its patch
+    const berry = sp.mat === 'berries', M = G.matter, a = berry ? Math.PI * (0.6 + Math.random() * 0.4) : Math.random() * 6.28, r = berry ? 1.45 + Math.random() * 0.3 : Math.random() * sp.r;
     const x = sp.at[0] + Math.cos(a) * r, z = sp.at[1] + Math.sin(a) * r;
     const inCave = Math.hypot(x - CAVE.x, z - CAVE.z) < CAVE.r;
     const l = M.makeLump(sp.sub, sp.mol * (0.8 + Math.random() * 0.4), { shape: sp.shape, name: sp.name });

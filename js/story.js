@@ -145,10 +145,10 @@ export function createStory(G, d) {
   // the rock pick: break samples off deposits, crush loose lumps (or the lumps in a container) to powder
   let pickT = 0;
   function chips(pos, color, n = 7) { for (let i = 0; i < n; i++) G.P.emit({ pos: pos.clone(), vel: V((Math.random() - 0.5) * 2, Math.random() * 2.2, (Math.random() - 0.5) * 2), life: 0.5, size: 0.025, size1: 0.01, color, alpha: 0.9, tex: 'smoke', gravity: 6 }); }
-  function pick(tg) {
+  function pick(tg, inHand) {
     if (G.time - pickT < 0.42) return;
     pickT = G.time;
-    const lk = tg.story, it = tg.best && tg.best.item;
+    const lk = inHand ? null : tg.story, it = inHand || (tg.best && tg.best.item);
     if (lk && lk.deposit && (!it || lk.dist < tg.best.dist)) {
       const dp = lk.deposit, at = G.player.pos.clone().addScaledVector(G.player.dir, lk.dist - 0.05);
       play('chip', at, 0.9); chips(at, new THREE.Color(dp.base).getHex());
@@ -173,6 +173,8 @@ export function createStory(G, d) {
       for (const id of it.mix.ids()) mix.add(id, it.mix.n[id], it.mix.T, SUB[id].state === 's' ? POWDER : undefined);
       play('chip', p, 0.8); chips(p, new THREE.Color(s.color).getHex(), 10);
       if (it.matId) foundMat(it.matId);
+      if (it.held) G.grab.release(false);
+      hud.toast('Crushed', it.sub === 'berries' ? 'Purple berry mash. Scoop it into water (spatula or trowel) for a natural pH indicator.' : `${it.name} crushed to powder. Scoop it up with the spatula or trowel.`);
       it.netCrushed = true; M().remove(it);
       M().emitParcel(mix, p.add(V(0, 0.03, 0)), V(0, -0.2, 0));
       return;

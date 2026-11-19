@@ -217,7 +217,11 @@ export function createMatter(G) {
     let shape, halfH;
     if (d.shape === 'box') {
       const [w, h, dd] = d.size;
-      if (d.look === 'lighter') {
+      if (d.look === 'thread') {
+        const pencil = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, w, 6).rotateZ(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xe8b830, roughness: 0.6 })); group.add(pencil);
+        const string = new THREE.Mesh(new THREE.CylinderGeometry(0.0009, 0.0009, 0.075, 5), new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 1 })); string.position.y = -0.0375; group.add(string);
+        const cluster = new THREE.Group(); cluster.position.y = -0.065; group.add(cluster); group.userData.cluster = cluster;
+      } else if (d.look === 'lighter') {
         const m = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.014, h * 0.6, 12), M.black); m.position.y = -h * 0.2; group.add(m);
         const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, h * 0.5, 8), M.steel); tube.position.y = h * 0.25; group.add(tube);
         const btn = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.02, 0.008), new THREE.MeshStandardMaterial({ color: 0xc8201c, roughness: 0.4 })); btn.position.set(0, -h * 0.02, 0.014); group.add(btn);

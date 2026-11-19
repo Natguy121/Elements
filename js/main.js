@@ -22,6 +22,7 @@ import { createHud, TOOLS } from './ui/hud.js';
 import { createStory, storyDefaults } from './story.js';
 import { createNet } from './net.js';
 import { createAsk } from './ui/ask.js';
+import { createThreads } from './matter/thread.js';
 
 const $ = (id) => document.getElementById(id);
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -72,6 +73,7 @@ function boot() {
   const lab = buildLab(G);
   lab.setStory(false); // opens the storage room, where the starting chemicals are
   const sim = createSim(G);
+  const threads = createThreads(G);
   const story = createStory(G, { save, persist: () => persist(), hud, player, lab });
   let state = 'menu', uiOpen = false;
 
@@ -303,11 +305,13 @@ function boot() {
     if (tool === 'tongs') {
       if (it.kind === 'vessel' && it.mix.firstChunk()) { const l = matter.takeChunk(it); matter.sync(l); grab.start(l, V(l.body.position.x, l.body.position.y, l.body.position.z), 'tongs'); play('clink', l.body.position, 0.4); return; }
       if (it.body.mass > 0.75) return hud.toast('Tongs', 'Too heavy for tongs. Put them away (1) and use your hands.');
+      if (it.hang) threads.detach(it);
       grab.start(it, b.point, 'tongs');
       return;
     }
     if (needsTongs(it)) { player.hurt(9 * G.settings.hazard, 'chem', G.time); return hud.toast('Chemical burn', `${SUB[it.sub].name} reacts with the moisture on skin. Use tongs (1).`, 'warn'); }
     if (it.mix && it.mix.T > hotMax() - 5) { player.hurt(7 * G.settings.hazard, 'burn', G.time); return hud.toast('Burn', 'That is hot. It looked exactly like cold glass, which is the problem. Use tongs or wait.', 'warn'); }
+    if (it.hang) threads.detach(it);
     grab.start(it, b.point, 'hand');
   }
   function secondary(tg, first, dt) {
@@ -359,6 +363,7 @@ function boot() {
       else if (!mix.isEmpty()) { const s = SUB[mix.dominant()]; fact = 'Mostly ' + s.name.toLowerCase() + '. ' + (s.fact || ''); tags = [...new Set(mix.ids().flatMap((id) => SUB[id].tags || []))]; }
       if (a.pH !== null && mix.n.indicator) rows.push(['pH (indicator)', a.pH.toFixed(1)]);
     }
+    if (it.type === 'thread') { const id = it.cmix && it.cmix.dominant(); rows.push(['Crystal', id ? `${SUB[id].name}, ${hud.fmtG(it.cmix.massG())}` : 'none yet'], ['Hanging in', it.hang ? it.hang.name : 'nothing']); }
     rows.unshift(['Mass', hud.fmtG(it.body.mass * 1000)]);
     rows.push(['Temperature', (tool === 'thermo' || G.settings.mode !== 'discovery') && mix ? mix.T.toFixed(1) + ' °C' : mix ? 'use the thermometer (4)' : 'room']);
     return { name, formula, rows, tags, fact };
@@ -621,6 +626,7 @@ function boot() {
     grab.update(dt, input);
     matter.update(dt, G.time);
     sim.update(dt);
+    threads.update(dt);
     gas.update(dt, G.time);
     lab.update(dt, G.time);
     story.update(dt);

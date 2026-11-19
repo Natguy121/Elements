@@ -175,7 +175,7 @@ Large pieces of sodium or potassium explode.
 - copper sulfate and alum for growing crystals
 - universal indicator, red cabbage juice and phenolphthalein
 
-pH is calculated for strong and weak acids and bases, so a titration flips sharply at the endpoint. Solubility depends on temperature: dissolve copper sulfate or alum in hot water on the hot plate, cool it on the chiller plate, and crystals grow in the glass. Press Z to fast-forward chemistry and heat (×4, ×16) for slow reactions and cooling. New reactions:
+pH is calculated for strong and weak acids and bases, so a titration flips sharply at the endpoint. Solubility depends on temperature: dissolve copper sulfate or alum in hot water on the hot plate, cool it on the chiller plate, and crystals grow in the glass. Crystal threads (a pencil with a cotton thread) lie by the copper sulfate. Drop one across the mouth of a beaker and the thread hangs into the solution, so the crystals grow on the thread as it cools; lift it out to keep the crystal. Press Z to fast-forward chemistry and heat (×4, ×16) for slow reactions and cooling. New reactions:
 - strong acid with strong base
 - acid with carbonate (baking soda, marble)
 - acid with metal (magnesium, iron)

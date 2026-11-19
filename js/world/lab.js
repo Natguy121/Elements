@@ -368,6 +368,8 @@ export function buildLab(G) {
     supplyJar('jar', 'alum', 0.6, 2.13, A, NB, { formula: 'KAl(SO4)2·12H2O' });
     supplyJar('bottle', 'cabbage', 0.06, 2.45, A, NB, { extra: [['water', 15]], formula: 'natural indicator', accent: '#5a3fa0' });
     supplyJar('dropper', 'phph', 0.06, 2.72, A, NB, { formula: 'pH 8.2-10' });
+    // crystal threads by the crystal-growing salts
+    for (const [x, z] of [[1.6, NB + 0.22], [1.95, NB + 0.22], [2.3, NB + 0.22]]) m.place(m.makeProp('thread'), x, A, z, 0.3);
     supplyJar('dropper', 'indicator', 0.06, 2.9, A, NB, { formula: 'pH 1-14' });
     supplyJar('dropper', 'dye_blue', 0.03, 3.36, A, -0.18, { formula: '', ry: Math.PI });
     supplyJar('jar', 'sucrose', 0.6, 1.0, A, 0.3);
@@ -460,6 +462,7 @@ export function buildLab(G) {
     G.stocked = new Set();
     glassware(m);
     m.place(m.makeProp('lighter'), -2.9, BENCH + 0.1, NZ0 + 0.5);
+    m.place(m.makeProp('thread'), 2.5, BENCH, 0.1); m.place(m.makeProp('thread'), 2.8, BENCH, 0.1);
     for (let i = 0; i < 6; i++) m.place(m.makeVessel('jar'), storeX + 0.02, 0.95, -3.2 + i * 0.4);
     // the storage room: one labelled jar per material, plus buckets for carrying
     const sx = SX1 - 0.24;

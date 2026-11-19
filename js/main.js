@@ -17,6 +17,7 @@ import { particleTextures } from './world/textures.js';
 import { buildLab } from './world/lab.js';
 import { buildClassroom, BOARD_DEFAULT } from './world/classroom.js';
 import { createMatter } from './matter/items.js';
+import { buildCarts } from './world/cart.js';
 import { createGas } from './matter/gas.js';
 import { createSim } from './matter/sim.js';
 import { createHud, TOOLS } from './ui/hud.js';
@@ -30,7 +31,7 @@ const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const SAVE_KEY = 'reaction-lab-save-v1';
 
 // ---------- save ----------
-const defaults = () => ({ found: {}, log: [], notes: '', story: storyDefaults(), settings: { sens: 1, fov: 72, volume: 0.8, quality: 'high', hazard: 1, bob: true, shake: true, flash: true, labVision: false, mode: 'student' } });
+const defaults = () => ({ found: {}, log: [], notes: '', story: storyDefaults(), settings: { sens: 1, fov: 72, volume: 0.8, quality: 'medium', hazard: 1, bob: true, shake: true, flash: true, labVision: false, mode: 'student' } });
 let save = defaults();
 try { const raw = localStorage.getItem(SAVE_KEY); if (raw) { const o = JSON.parse(raw); save = { ...defaults(), ...o, settings: { ...defaults().settings, ...(o.settings || {}) }, story: { ...storyDefaults(), ...(o.story || {}) } }; } } catch (e) { /* no storage: play without saving */ }
 let persistT = 0;
@@ -72,6 +73,7 @@ function boot() {
   const matter = createMatter(G); G.matter = matter;
   const gas = createGas(G); G.gas = gas;
   const lab = buildLab(G);
+  G.carts = buildCarts(G, scene, [[5.6, 7.2, 0], [-5.6, 7.2, 0]]);
   G.classroom = buildClassroom(G, lab); // Normal Mode's teaching lab, through the south door
   lab.setStory(false); // opens the storage room, where the starting chemicals are
   const sim = createSim(G);
@@ -670,7 +672,7 @@ function boot() {
     input.endFrame();
     // if the machine is struggling, give up sharpness before frame rate
     frames++;
-    if (frames > 60 && state === 'play') { slow = raw > 0.04 ? slow + 1 : Math.max(0, slow - 1); if (slow > 70 && scale > 0.55) { slow = 0; scale -= 0.15; applySettings(); } }
+    if (frames > 60 && state === 'play') { slow = raw > 0.03 ? slow + 1 : Math.max(0, slow - 1); if (slow > 40 && scale > 0.5) { slow = 0; scale -= 0.15; applySettings(); } }
   }
   requestAnimationFrame((now) => { last = now; frame(now); $('loading').classList.add('gone'); });
 }

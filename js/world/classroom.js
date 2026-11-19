@@ -59,7 +59,7 @@ export function buildClassroom(G, lab) {
   const bodies = [];
   const solid = (cx, cy, cz, w, h, d) => { const b = phys.staticBox(cx, cy, cz, w, h, d); bodies.push(b); return b; };
   const box = (w, h, d, mat, x, y, z, collide = true) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; root.add(m); if (collide) solid(x, y, z, w, h, d); return m; };
-  const cyl = (rt, rb, h, mat, x, y, z, seg = 14) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat); m.position.set(x, y, z); m.castShadow = true; root.add(m); return m; };
+  const cyl = (rt, rb, h, mat, x, y, z, seg = 14) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat); m.position.set(x, y, z); root.add(m); return m; };
   const fixtures = [];
 
   // ---------- the room ----------
@@ -93,7 +93,7 @@ export function buildClassroom(G, lab) {
   for (let x = -4.5; x <= 4.5; x += 3) for (let z = Z0 + 2.5; z < Z1; z += 4) {
     const p = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.04, 0.3), std({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 1.6 })); p.position.set(x, H - 0.03, z); root.add(p);
   }
-  for (const [x, z] of [[-3.5, 9], [3.5, 9], [-3.5, 15], [3.5, 15]]) { const l = new THREE.PointLight(0xfff4e6, 9, 12, 1.6); l.position.set(x, H - 0.4, z); root.add(l); }
+  for (const [x, z] of [[0, 9.5], [0, 15]]) { const l = new THREE.PointLight(0xfff4e6, 16, 14, 1.4); l.position.set(x, H - 0.4, z); root.add(l); }
 
   // ---------- benches, burners and stools ----------
   const burners = [];
@@ -111,7 +111,7 @@ export function buildClassroom(G, lab) {
     const outer = new THREE.Mesh(new THREE.ConeGeometry(0.016, 0.13, 14, 1, true), fm(0x2a5cff, 0.55)); outer.position.y = 0.065; fl.add(outer);
     const inner = new THREE.Mesh(new THREE.ConeGeometry(0.008, 0.055, 12, 1, true), fm(0x8fe0ff, 0.9)); inner.position.y = 0.028; fl.add(inner);
     fl.visible = false;
-    const light = new THREE.PointLight(0x5a7cff, 0, 3, 2); light.position.set(x, BENCH + 0.22, z); root.add(light);
+    const light = { intensity: 0 }; // flame is emissive; no extra point lights (they slow every pixel)
     const b = { on: false, pos: new THREE.Vector3(x, ty - 0.01, z), fl, light };
     lab.burners.push(b); burners.push(b);
     fixtures.push({ pos: new THREE.Vector3(x, BENCH + 0.06, z), r: 0.13, name: 'Bunsen burner', off: () => G.story, hint: () => (b.on ? 'Turn off the burner' : 'Light the burner'), use: () => { b.on = !b.on; fl.visible = b.on; play(b.on ? 'whoomp' : 'click', b.pos, 0.6); } });

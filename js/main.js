@@ -319,6 +319,7 @@ function boot() {
     const it = tg.best && tg.best.item, holder = it && it.kind === 'vessel' ? it : tg.puddle;
     const ahead = () => player.pos.clone().addScaledVector(player.dir, 0.55);
     if (grab.item && grab.item.tool === 'lighter') { if (first) play('spark', grab.item.body.position); lighterOn = true; return; }
+    if (grab.item && grab.item.def && grab.item.def.look === 'funnel') { if (first && !threads.scrape(grab.item, holder, ahead(), player.dir)) hud.toast('Funnel', grab.item.def.filter ? 'Nothing on the filter paper yet.' : 'Set it on top of a container, then pour into it.'); return; }
     if (grab.hold) return;
     if ((tool === 'spatula' || tool === 'trowel') && first && !toolLoad.isEmpty()) {
       if (holder && holder.kind === 'vessel') { holder.mix.merge(toolLoad); holder.dirty = true; holder.changed = G.time; }
@@ -363,6 +364,7 @@ function boot() {
       else if (!mix.isEmpty()) { const s = SUB[mix.dominant()]; fact = 'Mostly ' + s.name.toLowerCase() + '. ' + (s.fact || ''); tags = [...new Set(mix.ids().flatMap((id) => SUB[id].tags || []))]; }
       if (a.pH !== null && mix.n.indicator) rows.push(['pH (indicator)', a.pH.toFixed(1)]);
     }
+    if (it.def && it.def.look === 'funnel') { const id = it.cmix && it.cmix.dominant(); rows.push(['On the paper', id ? `${SUB[id].name}, ${hud.fmtG(it.cmix.massG())}` : 'nothing'], ['Sitting on', it.hang ? it.hang.name : 'nothing']); }
     if (it.type === 'thread') { const id = it.cmix && it.cmix.dominant(); rows.push(['Crystal', id ? `${SUB[id].name}, ${hud.fmtG(it.cmix.massG())}` : 'none yet'], ['Hanging in', it.hang ? it.hang.name : 'nothing']); }
     rows.unshift(['Mass', hud.fmtG(it.body.mass * 1000)]);
     rows.push(['Temperature', (tool === 'thermo' || G.settings.mode !== 'discovery') && mix ? mix.T.toFixed(1) + ' °C' : mix ? 'use the thermometer (4)' : 'room']);
@@ -417,7 +419,7 @@ function boot() {
       hud.setCross('hold');
       hud.setTarget(held.name, hud.fmtG(held.body.mass * 1000) + (grab.hold.strain > 0.8 ? ' · straining' : ''));
       const p = [['LMB', 'let go']];
-      if (held.kind === 'vessel') p.push(['RMB', 'pour']); else if (held.tool === 'lighter') p.push(['RMB', 'flame']);
+      if (held.kind === 'vessel') p.push(['RMB', 'pour']); else if (held.tool === 'lighter') p.push(['RMB', 'flame']); else if (held.def && held.def.filter && held.cmix && !held.cmix.isEmpty()) p.push(['RMB', 'scrape out the solid']); else if (held.def && held.def.look === 'funnel') p.push(['Drop', 'on a container']);
       if (held.kind === 'vessel' && (tg.story && tg.story.water || tg.fixture && tg.fixture.name === 'Kitchen tap')) p.push(['F', 'fill with water']);
       p.push(['X', 'set down'], ['Wheel', 'push/pull'], ['R', 'rotate']);
       if (student && held.mix && tg.best && tg.best.item.mix && tg.best.item !== held) { const r = reactsWith(held.mix, tg.best.item.mix); if (r) p.push(['Tip', 'these react: ' + r]); }

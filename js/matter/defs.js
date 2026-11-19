@@ -53,6 +53,8 @@ export const PROPS = {
   crateS: { name: 'Small crate', shape: 'box', size: [0.28, 0.24, 0.28], mass: 2.5, sound: 'wood', look: 'wood' },
   gascyl: { name: 'Nitrogen cylinder (full)', shape: 'cyl', size: [0.115, 1.3], mass: 58, sound: 'heavy', look: 'cylinder', fact: 'A full size-50 cylinder weighs about as much as a person. This is a two-person lift.' },
   barrel: { name: 'Steel drum (water)', shape: 'cyl', size: [0.29, 0.88], mass: 92, sound: 'heavy', look: 'barrel', fact: 'A 200 litre drum, part full. Nobody carries this alone.' },
+  funnel: { name: 'Funnel', shape: 'box', size: [0.1, 0.11, 0.1], mass: 0.07, sound: 'clink', look: 'funnel', fact: 'Set it on top of a container and pour into the wide end: nothing misses.' },
+  filterfunnel: { name: 'Filter funnel', shape: 'box', size: [0.1, 0.11, 0.1], mass: 0.072, sound: 'clink', look: 'funnel', filter: true, fact: 'A funnel lined with filter paper. Liquids and anything dissolved run through; undissolved solids (a precipitate, sand, chalk) stay on the paper. Right-click while holding it to scrape the solid out.' },
   thread: { name: 'Crystal thread', shape: 'box', size: [0.14, 0.012, 0.012], mass: 0.006, sound: 'wood', look: 'thread', fact: 'A cotton thread on a pencil. Lay the pencil across the top of a beaker of hot, saturated solution: as it cools, crystals grow on the thread.' },
   lighter: { name: 'Gas lighter', shape: 'box', size: [0.03, 0.2, 0.03], mass: 0.09, sound: 'metal', look: 'lighter', fact: 'Hold it and use the secondary action to make a flame.' },
 };

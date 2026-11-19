@@ -217,7 +217,12 @@ export function createMatter(G) {
     let shape, halfH;
     if (d.shape === 'box') {
       const [w, h, dd] = d.size;
-      if (d.look === 'thread') {
+      if (d.look === 'funnel') {
+        const prof = [[0.004, -0.055], [0.004, -0.005], [0.048, 0.05], [0.05, 0.055]].map(([r, y]) => new THREE.Vector2(r, y));
+        const cone = new THREE.Mesh(new THREE.LatheGeometry(prof, 24), M.glass); cone.renderOrder = 3; group.add(cone);
+        if (d.filter) { const paper = new THREE.Mesh(new THREE.ConeGeometry(0.042, 0.05, 20, 1, true).rotateX(Math.PI), new THREE.MeshStandardMaterial({ color: 0xf6f4ee, roughness: 1, side: THREE.DoubleSide })); paper.position.y = 0.024; group.add(paper); }
+        const res = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.02, 16).rotateX(Math.PI), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 })); res.position.y = 0.012; res.visible = false; group.add(res); group.userData.residue = res;
+      } else if (d.look === 'thread') {
         const pencil = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, w, 6).rotateZ(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xe8b830, roughness: 0.6 })); group.add(pencil);
         const string = new THREE.Mesh(new THREE.CylinderGeometry(0.0009, 0.0009, 0.075, 5), new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 1 })); string.position.y = -0.0375; group.add(string);
         const cluster = new THREE.Group(); cluster.position.y = -0.065; group.add(cluster); group.userData.cluster = cluster;
@@ -324,7 +329,9 @@ export function createMatter(G) {
           if (dx * dx + dy * dy + dz * dz > 0.09) continue;
           cv.set(p.x, p.y, p.z); it.body.pointToLocalFrame(cv, cv2);
           const hb = cv2.y + it.halfH, rad = Math.hypot(cv2.x, cv2.z), d = it.def;
-          if (hb > d.H - 0.045 && hb < d.H + 0.03 && rad < d.rimR + 0.004) {
+          const fn = it.funnel, top = fn ? 0.115 : 0.03, catchR = fn ? 0.05 : d.rimR + 0.004;
+          if (hb > d.H - 0.045 && hb < d.H + top && rad < catchR) {
+            if (!p.foam && fn && fn.def.filter) G.hooks.filter(fn, p.mix);
             if (!p.foam) { it.mix.merge(p.mix); it.dirty = true; it.changed = G.time; if (Math.random() < 0.3) play(p.r > 0.008 ? 'splash' : 'drip', b, 0.25); }
             if (G.landings) G.landings.push([p.x, p.z, 'in']);
             done = true; break;
@@ -335,7 +342,8 @@ export function createMatter(G) {
         const hit = phys.raycast(ox, oy, oz, p.x, p.y, p.z, G_STATIC | G_PROP | G_HELD);
         if (hit && !(hit.body.item === p.src && p.age < 0.25)) {
           const hp = hit.hitPointWorld, ny = hit.hitNormalWorld.y, tgt = hit.body.item;
-          if (tgt && tgt.kind === 'vessel' && ny > 0.6 && Math.hypot(hp.x - (tgt.base.x + tgt.up.x * tgt.def.H), hp.z - (tgt.base.z + tgt.up.z * tgt.def.H)) < tgt.def.rimR + 0.004) {
+          if (tgt && tgt.kind === 'vessel' && ny > 0.6 && Math.hypot(hp.x - (tgt.base.x + tgt.up.x * tgt.def.H), hp.z - (tgt.base.z + tgt.up.z * tgt.def.H)) < (tgt.funnel ? 0.05 : tgt.def.rimR + 0.004)) {
+            if (!p.foam && tgt.funnel && tgt.funnel.def.filter) G.hooks.filter(tgt.funnel, p.mix);
             if (!p.foam) { tgt.mix.merge(p.mix); tgt.dirty = true; tgt.changed = G.time; }
             if (G.landings) G.landings.push([hp.x, hp.z, 'in']);
             done = true;

@@ -507,7 +507,7 @@ function boot() {
     hud.setStory(G.story);
     state = 'play'; $('menu').hidden = true; hud.show(true); uiOpen = false; input.st.enabled = true;
     $('touch').hidden = input.st.mode !== 'tap';
-    if (mode === 'normal') { player.teleport(0, 0.35, 3.2); player.yaw = 0; player.pitch = -0.08; }
+    if (mode === 'normal') { player.teleport(0, 0.35, 6.4); player.yaw = Math.PI; player.pitch = -0.08; } // start in the teaching lab, facing the class
     try { input.lock(); } catch (e) { /* the browser may refuse until a click */ }
     refreshTool();
     if (o.guest) { hud.guide(false); hud.toast('Multiplayer', 'Joined. Everyone sees what you grab and pour.'); return; }

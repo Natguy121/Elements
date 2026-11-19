@@ -293,7 +293,11 @@ export function buildLab(G) {
   const annexDoor = makeDoor(G, { x: X1 + 0.15, z: 1.1, a0: -Math.PI / 2, a1: -0.15, mat: std({ color: 0x66757c, roughness: 0.45 }), name: 'Storage room door' });
   annexDoor.show(false);
   fixtures.push(annexDoor.fixture);
+  // Normal Mode's new look (matching the teaching lab); Story Mode keeps the old grey lab
+  const LOOK = { normal: { wall: 0xcfe3df, cab: 0x2f8f86, floor: 0xd8c4a8 }, story: { wall: 0xd4d8d4, cab: 0xd9dedd, floor: 0xffffff } };
   function setStory(on) {
+    const lk = on ? LOOK.story : LOOK.normal;
+    M.wall.color.setHex(lk.wall); M.cab.color.setHex(lk.cab); M.floor.color.setHex(lk.floor);
     // the storage room is open in both modes: sample jars in Story Mode, the starting chemicals in Normal Mode
     eastFull.mesh.visible = false; for (const e of eastSplit) e.mesh.visible = true;
     if (phys.world.bodies.includes(eastFull.body)) phys.world.removeBody(eastFull.body);

@@ -563,13 +563,14 @@ function boot() {
   }
   // ---------- owner code: god mode ----------
   const OWNER = 'Antoine121';
-  function setGod(on) { player.god = on; G.settings.god = on; persist(); $('godChip').hidden = !on; if (on) { player.health = 100; player.stamina = 1; } }
+  function setGod(on) { player.god = on; G.settings.god = on; persist(); $('godChip').hidden = !on; $('godOff').hidden = !on; if (on) { player.health = 100; player.stamina = 1; } }
   $('ownerBtn').onclick = () => {
     const v = $('ownerCode').value; $('ownerCode').value = '';
     if (v !== OWNER) { hud.toast('Owner code', 'That code is not right.', 'warn'); return; }
     setGod(!player.god); play('ding');
     hud.toast('Owner', player.god ? 'God mode on: nothing hurts you, stamina never runs out, and you can lift anything.' : 'God mode off.');
   };
+  $('godOffBtn').onclick = () => { setGod(false); play('click'); hud.toast('Owner', 'God mode off.'); };
   $('ownerCode').onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') $('ownerBtn').click(); };
   if (G.settings.god) setGod(true);
   $('mpName').value = net.name;
